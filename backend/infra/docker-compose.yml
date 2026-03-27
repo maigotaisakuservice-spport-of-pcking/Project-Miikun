@@ -19,9 +19,9 @@ services:
       - LORA_PATH=/app/models/active_lora/
       - N_GPU_LAYERS=-1
     volumes:
-      - ./backend:/app
-      - ./models:/app/models
-      - ./backend/data:/app/data
+      - ..:/app
+      - ../../models:/app/models
+      - ../data:/app/data
     deploy:
       resources:
         reservations:
@@ -55,8 +55,8 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./frontend:/usr/share/nginx/html
-      - ./assets:/usr/share/nginx/html/assets
+      - ../..:/usr/share/nginx/html
+      - ../../assets:/usr/share/nginx/html/assets
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend

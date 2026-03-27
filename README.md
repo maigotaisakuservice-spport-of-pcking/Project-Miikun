@@ -30,10 +30,22 @@ docker-compose up -d
    - Nginx 等で `frontend` ディレクトリを公開してください。
    - `assets/miikun.vrm` を配置してください。
 
-## 🧠 🧠 MLOps: 週次学習の仕組み
-1. **データ抽出**: 毎週日曜 AM3:00、50件以上の新規会話ログがある場合に `export_logs.py` が実行されます。
-2. **学習 (LoRA)**: GitHub Actions 上で LoRA 学習が行われ、`models/active_lora` が更新されます。
-3. **ホットリロード**: 学習完了後、VPS の `/api/webhook/reload` が叩かれ、サーバーを止めずに新しい知識が適用されます。
+## 🧠 🧠 継続的自己進化 (Continuous Evolution) システム
+みーくんは、ユーザーとの対話を通じて毎週成長します。その仕組みは以下の通りです：
+
+1. **対話ログの蓄積**: 日々の会話は `backend/data/logs.db` に保存されます。
+2. **週次データ抽出**: 毎週日曜 AM3:00（JST）、GitHub Actions が起動し、VPS 上の `backend/scripts/export_logs.py` を呼び出します。
+   - **セーフティガード**: 新規ログが **50件以上** ある場合のみ、学習用の `train_data.jsonl` を生成します。
+3. **クラウド学習 (LoRA)**: 生成されたデータは GitHub Actions ランナーへ転送され、GPU を用いて LoRA（Low-Rank Adaptation）学習が実行されます。
+   - ベースモデル（Llama-3-8B等）の知識を保ちつつ、直近の会話傾向を微調整します。
+4. **自動デプロイと反映**:
+   - 新しい学習済み重み（`models/active_lora`）がリポジトリに push されます。
+   - その後、VPS の `/api/webhook/reload` エンドポイントが叩かれます。
+5. **ホットリロード (Hot Reload)**:
+   - バックエンドが `git pull` を実行して最新の重みを取得します。
+   - 推論エンジンが再起動なしで LoRA アダプタを付け替え、即座に新しい「みーくん」として会話を再開します。
+
+このサイクルにより、みーくんは「昨日よりも少しだけ自分を理解してくれるクラスメイト」へと進化し続けます。
 
 ## 🎨 🎨 ライセンスと帰属 (License & Attribution)
 - **System Code**: MIT License

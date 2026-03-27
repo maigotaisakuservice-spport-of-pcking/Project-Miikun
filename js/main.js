@@ -21,7 +21,7 @@ class MiikunApp {
     async init() {
         // Load VRM
         try {
-            await this.vrmLoader.loadVRM('../assets/miikun.vrm');
+            await this.vrmLoader.loadVRM('assets/miikun.vrm');
         } catch (e) {
             console.warn("VRM file not found or failed to load. Using basic scene.");
         }
