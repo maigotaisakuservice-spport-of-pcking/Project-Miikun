@@ -1,0 +1,8 @@
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /css/style.css HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /js/main.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /js/state.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /js/audio_io.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /js/vrm_loader.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:27] "GET /js/api.js HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2026 05:59:28] "GET /assets/miikun.vrm HTTP/1.1" 200 -

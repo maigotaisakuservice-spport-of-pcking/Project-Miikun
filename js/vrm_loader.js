@@ -29,7 +29,7 @@ export class VRMLoader {
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
-        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
         // Scene
         this.scene = new THREE.Scene();
@@ -80,6 +80,10 @@ export class VRMLoader {
                 },
                 (error) => {
                     console.error('Error loading VRM:', error);
+                    // Specific check for 0-byte or invalid files (often causes RangeError)
+                    if (error instanceof RangeError) {
+                        console.error('VRM file appears to be invalid or 0-byte (placeholder). Please replace assets/miikun.vrm with a real VRM model.');
+                    }
                     reject(error);
                 }
             );

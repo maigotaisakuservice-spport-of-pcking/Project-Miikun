@@ -23,7 +23,8 @@ class MiikunApp {
         try {
             await this.vrmLoader.loadVRM('assets/miikun.vrm');
         } catch (e) {
-            console.warn("VRM file not found or failed to load. Using basic scene.");
+            console.warn("VRM file not found or placeholder detected. Ensure assets/miikun.vrm is a valid VRM file.");
+            // Optional: Provide a visual indicator in logs if needed.
         }
 
         // Subscribe to state changes
