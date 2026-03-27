@@ -70,14 +70,34 @@ sudo systemctl enable miikun
 sudo systemctl start miikun
 ```
 
+## 🔑 🔑 GitHub Secrets の登録
+GitHub Actions を正常に動作させるため、リポジトリの **Settings > Secrets and variables > Actions** から以下のシークレットを登録してください。
+
+| Secret 名 | 内容 | 例 |
+| :--- | :--- | :--- |
+| `VPS_HOST` | VPS の IP アドレスまたはドメイン | `123.456.78.90` |
+| `VPS_USER` | SSH 接続に使用するユーザー名 | `ubuntu` |
+| `VPS_SSH_KEY` | VPS への SSH 秘密鍵 (id_rsa の中身) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `VPS_URL` | バックエンド API のベース URL (SSL推奨) | `https://your-domain.com` |
+| `HF_TOKEN` | Hugging Face のアクセストークン (Read権限) | `hf_xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `HF_BASE_MODEL` | 使用するベースモデルのパス | `elyza/ELYZA-japanese-Llama-3-8B-Instruct` |
+| `WEBHOOK_SECRET` | リロード用シークレット (backend/.env と一致させる) | `your_secure_random_string` |
+
 ## 🔐 🔐 セキュリティ設定
 - **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。
 - **Shared Secret**: フロントエンドとバックエンド間の簡易的な合言葉（`SHARED_SECRET`）です。
 - **Master Secret**: 手動学習トリガー（`/api/admin/train`）を叩くための管理者用秘密鍵です。コードには含めず `.env` で管理してください。
 
 ## 🧠 🧠 継続的自己進化 (Continuous Evolution) システム
-みーくんは、ユーザーとの対話を通じて毎週成長します。その仕組みは以下の通りです：
+みーくんは、ユーザーとの対話を通じて毎週成長します。
 
+### 初回トレーニング (Initial Setup)
+システムを最初に起動した直後は LoRA 重みがありません。以下の手順で最初のアダプタを生成してください：
+1. GitHub のリポジトリページから **Actions** タブを開きます。
+2. 左メニューの **"Initial Miikun Training"** を選択します。
+3. **"Run workflow"** ボタンをクリックして実行してください。
+
+### 継続的学習サイクル
 1. **対話ログの蓄積**: 日々の会話は `backend/data/logs.db` に保存されます。
 2. **週次データ抽出**: 毎週日曜 AM3:00（JST）、GitHub Actions が起動し、VPS 上の `backend/scripts/export_logs.py` を呼び出します。
    - **セーフティガード**: 新規ログが **50件以上** ある場合のみ、学習用の `train_data.jsonl` を生成します。

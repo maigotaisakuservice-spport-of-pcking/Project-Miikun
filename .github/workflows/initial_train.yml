@@ -1,0 +1,69 @@
+name: Initial Miikun Training
+
+on:
+  workflow_dispatch: # Manual trigger only for the first setup
+
+jobs:
+  initial-train:
+    runs-on: ubuntu-latest # or self-hosted GPU runner
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements_train.txt
+
+      - name: Export Initial Logs from VPS (Optional)
+        if: env.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/miikun
+            source backend/venv/bin/activate
+            # Ensure DB exists
+            python3 backend/db.py
+            # Try to export even if < 50 logs for the first time?
+            # (Or just use a seed file)
+            python3 backend/scripts/export_logs.py || echo "No logs to export, using defaults."
+
+      - name: Download Training Data from VPS
+        if: env.VPS_HOST != ''
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > vps_key.pem
+          chmod 600 vps_key.pem
+          scp -o StrictHostKeyChecking=no -i vps_key.pem ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/miikun/train_data.jsonl ./train_data.jsonl || echo "No VPS data"
+          rm vps_key.pem
+
+      - name: Run Initial LoRA Training
+        run: |
+          # Note: Requires GPU in standard runners.
+          # Use self-hosted or managed GPU runners.
+          python3 backend/scripts/train.py
+        env:
+          BASE_MODEL: ${{ secrets.HF_BASE_MODEL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      - name: Push Initial LoRA Weights
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add models/active_lora/
+          git commit -m "Initial LoRA Training Complete"
+          git push origin main
+
+      - name: Trigger Webhook Reload
+        run: |
+          curl -X POST "${{ secrets.VPS_URL }}/api/webhook/reload" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}"
