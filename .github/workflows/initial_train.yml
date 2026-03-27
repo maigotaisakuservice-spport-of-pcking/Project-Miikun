@@ -57,13 +57,20 @@ jobs:
 
       - name: Push Initial LoRA Weights
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add models/active_lora/
-          git commit -m "Initial LoRA Training Complete"
-          git push origin main
+          if [ -d "models/active_lora/" ] && [ "$(ls -A models/active_lora/)" ]; then
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add models/active_lora/
+            git commit -m "Initial LoRA Training Complete"
+            git push origin main
+            echo "pushed=true" >> $GITHUB_ENV
+          else
+            echo "No training artifacts found. Skipping push."
+            echo "pushed=false" >> $GITHUB_ENV
+          fi
 
       - name: Trigger Webhook Reload
+        if: env.pushed == 'true'
         run: |
           curl -X POST "${{ secrets.VPS_URL }}/api/webhook/reload" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}"
