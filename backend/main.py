@@ -1,9 +1,11 @@
 import os
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import subprocess
+import os
 from dotenv import load_dotenv
 
 from .db import init_db, insert_log
@@ -14,8 +16,20 @@ load_dotenv()
 
 app = FastAPI(title="Miikun Intelligence API")
 
-API_KEY = os.getenv("API_KEY", "your_secret_api_key")
+# Security Config
+SHARED_SECRET = os.getenv("SHARED_SECRET", "miikun_shared_pass") # Visible in frontend source
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "your_webhook_secret")
+MASTER_SECRET = os.getenv("MASTER_SECRET", "your_admin_master_secret") # NOT visible in frontend
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
+# CORS Middleware for Domain-based security
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Models for Request/Response
 class ChatRequest(BaseModel):
@@ -27,15 +41,19 @@ class ChatRequest(BaseModel):
 async def startup_event():
     init_db()
 
-async def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Invalid API Key")
+async def verify_shared_secret(x_api_key: str = Header(...)):
+    """
+    Check the 'Shared Secret' from frontend.
+    Note: Domain restriction (CORS) is the primary security for frontend clients.
+    """
+    if x_api_key != SHARED_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid Shared Secret")
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
 
-@app.post("/api/chat", dependencies=[Depends(verify_api_key)])
+@app.post("/api/chat", dependencies=[Depends(verify_shared_secret)])
 async def chat(request: ChatRequest):
     """
     1. Inference with LLM
@@ -53,7 +71,7 @@ async def chat(request: ChatRequest):
         "reply_text": reply_text
     }
 
-@app.get("/api/tts", dependencies=[Depends(verify_api_key)])
+@app.get("/api/tts", dependencies=[Depends(verify_shared_secret)])
 async def tts(text: str):
     """
     Generates audio from text and returns a WAV stream.
@@ -64,6 +82,25 @@ async def tts(text: str):
     except Exception as e:
         print(f"TTS Error: {e}")
         raise HTTPException(status_code=500, detail="Voice synthesis failed")
+
+@app.post("/api/admin/train")
+async def trigger_manual_train(authorization: str = Header(...)):
+    """
+    Manually trigger data export and notify admin.
+    Secured by MASTER_SECRET (Admin Only).
+    """
+    if authorization != f"Bearer {MASTER_SECRET}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        # Run export script
+        result = subprocess.run(
+            ["python3", "backend/scripts/export_logs.py"],
+            capture_output=True, text=True, check=True
+        )
+        return {"status": "success", "message": "Log export successful. Ready for training.", "output": result.stdout}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/webhook/reload")
 async def reload_lora(authorization: str = Header(...)):
@@ -87,7 +124,7 @@ async def reload_lora(authorization: str = Header(...)):
         raise HTTPException(status_code=500, detail=f"Reload failed: {str(e)}")
 
 # Add a combined endpoint if we want lower latency (Text + Base64 Audio)
-@app.post("/api/chat_full", dependencies=[Depends(verify_api_key)])
+@app.post("/api/chat_full", dependencies=[Depends(verify_shared_secret)])
 async def chat_full(request: ChatRequest):
     reply_text = engine.generate_reply(request.history, request.text)
     insert_log(request.session_id, request.text, reply_text)

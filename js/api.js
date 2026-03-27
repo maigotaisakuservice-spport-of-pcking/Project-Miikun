@@ -1,6 +1,6 @@
-// ⚠️ WARNING: Keep this API_KEY synchronized with your backend .env file.
-// In a production environment, consider using more secure authentication patterns.
-const API_KEY = "your_secret_api_key_here";
+// ⚠️ SHARED_SECRET: This is a basic handshake key.
+// Primary security is provided by Domain/Origin restriction on the backend.
+const SHARED_SECRET = "miikun_shared_pass";
 const BASE_URL = "/api";
 
 export async function chat(sessionId, text, history) {
@@ -8,7 +8,7 @@ export async function chat(sessionId, text, history) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "x-api-key": API_KEY
+            "x-api-key": SHARED_SECRET
         },
         body: JSON.stringify({
             session_id: sessionId,
@@ -28,7 +28,7 @@ export async function getTtsAudio(text) {
     const response = await fetch(`${BASE_URL}/tts?text=${encodeURIComponent(text)}`, {
         method: "GET",
         headers: {
-            "x-api-key": API_KEY
+            "x-api-key": SHARED_SECRET
         }
     });
 
@@ -46,7 +46,7 @@ export async function chatFull(sessionId, text, history) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "x-api-key": API_KEY
+            "x-api-key": SHARED_SECRET
         },
         body: JSON.stringify({
             session_id: sessionId,

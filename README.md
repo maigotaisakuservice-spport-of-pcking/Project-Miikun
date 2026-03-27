@@ -10,25 +10,70 @@
 - **Engine**: [VOICEVOX Engine](https://github.com/VOICEVOX/voicevox_engine)
 - **Runtime**: Python 3.10+, Node.js (ブラウザ閲覧用)
 
-### 2. インストール手順 (Quick Start with Docker)
+### 2. クイックスタート (Docker Compose 推奨)
+GPU環境がある場合、Docker Compose を使うのが最も簡単です。
+
 ```bash
 git clone https://github.com/your-username/miikun-core.git
 cd miikun-core
 cp backend/.env.example backend/.env
-# .env を編集して API_KEY 等を設定してください
 
-# Docker Compose で一括起動
-docker-compose up -d
+# .env を編集
+# ALLOWED_ORIGINS に自分のドメインを記載してください
+# MASTER_SECRET, WEBHOOK_SECRET を安全な文字列に変更してください
+
+# 起動
+docker-compose -f backend/infra/docker-compose.yml up -d
 ```
 
-### 3. 手動セットアップ (Manual Setup)
-1. **Backend**:
-   - `python -m venv venv && source venv/bin/activate`
-   - `pip install -r backend/requirements.txt`
-   - `python backend/main.py`
-2. **Frontend**:
-   - Nginx 等で `frontend` ディレクトリを公開してください。
-   - `assets/miikun.vrm` を配置してください。
+### 3. Ubuntu 22.04 LTS での手動セットアップ詳細
+
+#### 3.1 Python 環境構築
+```bash
+sudo apt update && sudo apt install -y python3-venv python3-pip git-lfs
+
+# 仮想環境の作成
+cd miikun-core
+python3 -m venv venv
+source venv/bin/activate
+
+# llama-cpp-python の GPU 高速化ビルド (CUDA環境の場合)
+# 事前に CUDA Toolkit がインストールされている必要があります
+export CMAKE_ARGS="-DLLAMA_CUBLAS=on"
+export FORCE_CMAKE=1
+pip install -r backend/requirements.txt
+```
+
+#### 3.2 VOICEVOX Engine の起動 (Docker)
+```bash
+# GPU版
+docker run -d -p 50021:50021 voicevox/voicevox_engine:gpu-ubuntu22.04-latest
+```
+
+#### 3.3 Nginx と SSL (Certbot) 設定
+`/etc/nginx/sites-available/miikun` を `backend/infra/nginx.conf` を元に作成し、以下のコマンドを実行します。
+
+```bash
+sudo ln -s /etc/nginx/sites-available/miikun /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl restart nginx
+
+# SSL化 (マイクの使用に必須)
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
+```
+
+#### 3.4 Systemd サービス登録
+```bash
+sudo cp backend/infra/miikun.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable miikun
+sudo systemctl start miikun
+```
+
+## 🔐 🔐 セキュリティ設定
+- **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。
+- **Shared Secret**: フロントエンドとバックエンド間の簡易的な合言葉（`SHARED_SECRET`）です。
+- **Master Secret**: 手動学習トリガー（`/api/admin/train`）を叩くための管理者用秘密鍵です。コードには含めず `.env` で管理してください。
 
 ## 🧠 🧠 継続的自己進化 (Continuous Evolution) システム
 みーくんは、ユーザーとの対話を通じて毎週成長します。その仕組みは以下の通りです：
