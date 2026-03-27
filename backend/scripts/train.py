@@ -21,6 +21,11 @@ MAX_MINUTES = 25 # Training timeout safety guard
 def train():
     start_time = time.time()
 
+    # CUDA Check
+    if not torch.cuda.is_available():
+        print("Error: CUDA is not available. Training requires a GPU.")
+        sys.exit(0) # Exit gracefully in CI if no GPU
+
     if not os.path.exists(TRAIN_DATA):
         print(f"Skipping: {TRAIN_DATA} not found.")
         sys.exit(0)

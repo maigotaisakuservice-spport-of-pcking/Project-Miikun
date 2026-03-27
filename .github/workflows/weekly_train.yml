@@ -8,12 +8,15 @@ on:
 jobs:
   train:
     runs-on: ubuntu-latest # or self-hosted GPU runner
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -22,7 +25,8 @@ jobs:
           pip install -r backend/requirements_train.txt
 
       - name: Export Logs from VPS
-        uses: appleboy/ssh-action@v0.1.10
+        if: env.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1.2.1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -33,6 +37,7 @@ jobs:
             python backend/scripts/export_logs.py
 
       - name: Download Training Data from VPS
+        if: env.VPS_HOST != ''
         run: |
           echo "${{ secrets.VPS_SSH_KEY }}" > vps_key.pem
           chmod 600 vps_key.pem
