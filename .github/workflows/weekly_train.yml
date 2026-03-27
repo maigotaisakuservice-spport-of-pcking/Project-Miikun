@@ -1,0 +1,62 @@
+name: Weekly Miikun Training & Deployment
+
+on:
+  schedule:
+    - cron: '0 18 * * 0' # Sunday AM3:00 JST
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  train:
+    runs-on: ubuntu-latest # or self-hosted GPU runner
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements_train.txt
+
+      - name: Export Logs from VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/miikun
+            source backend/venv/bin/activate
+            python backend/scripts/export_logs.py
+
+      - name: Download Training Data from VPS
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > vps_key.pem
+          chmod 600 vps_key.pem
+          scp -o StrictHostKeyChecking=no -i vps_key.pem ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/miikun/train_data.jsonl ./train_data.jsonl
+          rm vps_key.pem
+
+      - name: Run LoRA Training
+        run: |
+          # Note: Requires GPU in standard runners.
+          # Use self-hosted or managed GPU runners for this step.
+          python backend/scripts/train.py
+        env:
+          BASE_MODEL: ${{ secrets.HF_BASE_MODEL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      - name: Push New LoRA Weights
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add models/active_lora/
+          git commit -m "Weekly LoRA Update: $(date +'%Y-%m-%d')"
+          git push origin main
+
+      - name: Trigger Webhook Reload
+        run: |
+          curl -X POST "${{ secrets.VPS_URL }}/api/webhook/reload" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}"

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Main FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: miikun-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - VOICEVOX_URL=http://voicevox:50021
+      - SPEAKER_ID=13
+      - MODEL_PATH=/app/models/base_model.gguf
+      - LORA_PATH=/app/models/active_lora/
+      - N_GPU_LAYERS=-1
+    volumes:
+      - ./backend:/app
+      - ./models:/app/models
+      - ./backend/data:/app/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - voicevox
+
+  # VOICEVOX Engine
+  voicevox:
+    image: voicevox/voicevox_engine:gpu-ubuntu22.04-latest
+    container_name: miikun-voicevox
+    restart: always
+    ports:
+      - "50021:50021"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Frontend Nginx (Optional: If not using system Nginx)
+  frontend:
+    image: nginx:alpine
+    container_name: miikun-frontend
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./assets:/usr/share/nginx/html/assets
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend

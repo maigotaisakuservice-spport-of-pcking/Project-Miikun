@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miikun Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./css/style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+          "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@2.0.0/lib/three-vrm.module.js"
+        }
+      }
+    </script>
+</head>
+<body class="bg-[#FAFAFA] overflow-hidden text-slate-900 h-screen w-screen">
+
+    <!-- 3D Canvas Layer -->
+    <canvas id="miikun-canvas" class="absolute inset-0 w-full h-full -z-10"></canvas>
+
+    <!-- Glassmorphic Chat Log Layer -->
+    <div id="chat-container" class="absolute right-0 top-0 w-[35%] h-full overflow-y-auto px-12 pt-40 pb-64 no-scrollbar flex flex-col justify-end pointer-events-none">
+        <!-- Messages will be appended here -->
+    </div>
+
+    <!-- UI Layer -->
+    <div class="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center">
+        <!-- Waveform Indicator -->
+        <div id="waveform" class="flex gap-1 h-6 mb-8 opacity-10 transition-all duration-300">
+            <div class="w-1 bg-slate-400 rounded-full h-full animate-wave-1"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-3/4 animate-wave-2"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-1/2 animate-wave-3"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-3/4 animate-wave-2"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-full animate-wave-1"></div>
+        </div>
+
+        <!-- Mic Button -->
+        <button id="mic-button" class="group relative w-20 h-20 rounded-full bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center">
+            <div id="mic-ring" class="absolute inset-0 rounded-full border-4 border-blue-400/0 transition-all duration-300"></div>
+            <svg id="mic-icon" class="w-10 h-10 text-slate-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+            </svg>
+        </button>
+
+        <p id="status-text" class="mt-4 text-xs font-medium text-slate-400 tracking-widest uppercase opacity-0 transition-opacity">Listening...</p>
+    </div>
+
+    <!-- License / Attribution -->
+    <div class="absolute bottom-4 right-6 text-[10px] text-slate-400/20 hover:text-slate-400/80 transition-colors duration-300 select-none">
+        VRM Model by Meshy (CC BY 4.0) | AI Powered by Miikun Core
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
