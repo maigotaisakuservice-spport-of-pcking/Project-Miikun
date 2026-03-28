@@ -7,8 +7,22 @@ export class AudioIO {
         this.onResultCallback = null;
         this.onErrorCallback = null;
         this.audioElement = new Audio();
+        this.audioElement.crossOrigin = "anonymous";
+
+        // Audio Analysis for Visualizer
+        this.audioContext = null;
+        this.analyser = null;
+        this.microphoneStream = null;
+        this.sourceNode = null;
 
         this.setupRecognition();
+    }
+
+    async initAudioContext() {
+        if (this.audioContext) return;
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
     }
 
     setupRecognition() {
@@ -43,24 +57,53 @@ export class AudioIO {
         };
     }
 
-    startListening(onResult, onError) {
+    async startListening(onResult, onError) {
         if (!this.recognition) return;
         this.onResultCallback = onResult;
         this.onErrorCallback = onError;
 
+        await this.initAudioContext();
+
         try {
+            // Setup Microphone for analysis
+            if (!this.microphoneStream) {
+                this.microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const micSource = this.audioContext.createMediaStreamSource(this.microphoneStream);
+                micSource.connect(this.analyser);
+            }
+
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+
             this.recognition.start();
             this.isListening = true;
             state.setState(AppState.LISTENING);
         } catch (e) {
-            console.error("Recognition already started:", e);
+            console.error("Microphone or Recognition error:", e);
+            if (onError) onError(e);
         }
     }
 
-    async playTts(audioUrl) {
+    async playTts(audioUrl, fallbackText = null) {
+        await this.initAudioContext();
+
         return new Promise((resolve) => {
             state.setState(AppState.SPEAKING);
+
+            if (!audioUrl && fallbackText) {
+                this.playNativeTts(fallbackText).then(resolve);
+                return;
+            }
+
             this.audioElement.src = audioUrl;
+
+            // Connect Audio Element to Analyser (only once)
+            if (!this.sourceNode) {
+                this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement);
+                this.sourceNode.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+            }
             this.audioElement.onended = () => {
                 state.setState(AppState.IDLE);
                 resolve();
@@ -78,13 +121,31 @@ export class AudioIO {
         });
     }
 
+    async playNativeTts(text) {
+        return new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ja-JP';
+            utterance.onend = () => {
+                state.setState(AppState.IDLE);
+                resolve();
+            };
+            utterance.onerror = () => {
+                state.setState(AppState.IDLE);
+                resolve();
+            };
+            window.speechSynthesis.speak(utterance);
+        });
+    }
+
     // Helper to check if currently speaking for lip-sync
     isSpeaking() {
         return !this.audioElement.paused && !this.audioElement.ended;
     }
 
-    getAudioVolume() {
-        // Basic volume analysis if needed for lip-sync
-        return this.audioElement.paused ? 0 : 0.5; // Placeholder
+    getVolumeData() {
+        if (!this.analyser) return new Uint8Array(0);
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteFrequencyData(dataArray);
+        return dataArray;
     }
 }

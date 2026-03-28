@@ -10,12 +10,37 @@ class MiikunApp {
         this.micRing = document.getElementById('mic-ring');
         this.waveform = document.getElementById('waveform');
         this.statusText = document.getElementById('status-text');
+        this.loadingIndicator = document.getElementById('loading-indicator');
 
         this.vrmLoader = new VRMLoader('miikun-canvas');
         this.audioIO = new AudioIO();
         this.history = [];
 
         this.init();
+        this.updateWaveform();
+    }
+
+    updateWaveform() {
+        requestAnimationFrame(() => this.updateWaveform());
+
+        const curState = state.getState();
+        if (curState === AppState.LISTENING || curState === AppState.SPEAKING) {
+            const data = this.audioIO.getVolumeData();
+            if (data.length > 0) {
+                // Pick 5 samples for the 5 bars
+                const bars = this.waveform.querySelectorAll('div');
+                const indices = [10, 30, 50, 70, 90];
+                bars.forEach((bar, i) => {
+                    const val = data[indices[i]] || 0;
+                    const scale = 0.1 + (val / 255) * 1.5;
+                    bar.style.transform = `scaleY(${scale})`;
+                });
+            }
+        } else {
+            // Reset bars
+            const bars = this.waveform.querySelectorAll('div');
+            bars.forEach(bar => bar.style.transform = `scaleY(1)`);
+        }
     }
 
     async init() {
@@ -51,19 +76,25 @@ class MiikunApp {
                 this.waveform.classList.add('opacity-10');
                 this.waveform.classList.remove('opacity-100');
                 this.statusText.classList.add('opacity-0');
+                this.loadingIndicator.classList.add('opacity-0');
                 this.vrmLoader.setSpeaking(false);
+                this.vrmLoader.setLeaning(false);
                 break;
 
             case AppState.LISTENING:
                 this.micRing.classList.add('mic-pulse', 'border-blue-400/80');
                 this.waveform.classList.remove('opacity-10');
                 this.waveform.classList.add('opacity-100');
+                const bars = this.waveform.querySelectorAll('div');
+                bars.forEach(bar => bar.classList.remove('animate-wave-1', 'animate-wave-2', 'animate-wave-3'));
                 this.statusText.classList.remove('opacity-0');
                 this.statusText.innerText = "Listening...";
+                this.vrmLoader.setLeaning(true);
                 break;
 
             case AppState.THINKING:
                 this.micButton.classList.add('opacity-50', 'cursor-not-allowed');
+                this.loadingIndicator.classList.remove('opacity-0');
                 this.statusText.innerText = "Thinking...";
                 break;
 
@@ -96,10 +127,18 @@ class MiikunApp {
             if (result.status === 'success') {
                 this.addMessage('miikun', result.reply_text);
 
-                // Audio Playback
+                // Emotion handling
+                if (result.emotion) {
+                    this.vrmLoader.setEmotion(result.emotion);
+                }
+
+                // Audio Playback with Fallback
                 if (result.audio) {
                     const audioUrl = `data:audio/wav;base64,${result.audio}`;
-                    await this.audioIO.playTts(audioUrl);
+                    await this.audioIO.playTts(audioUrl, result.reply_text);
+                } else {
+                    // Fallback to browser TTS
+                    await this.audioIO.playTts(null, result.reply_text);
                 }
 
                 // Update History

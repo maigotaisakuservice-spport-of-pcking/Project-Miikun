@@ -2,6 +2,8 @@ name: Initial Miikun Training
 
 on:
   workflow_dispatch: # Manual trigger only for the first setup
+  repository_dispatch:
+    types: [manual_train]
 
 jobs:
   initial-train:

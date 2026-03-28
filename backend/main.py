@@ -55,20 +55,16 @@ async def health():
 
 @app.post("/api/chat", dependencies=[Depends(verify_shared_secret)])
 async def chat(request: ChatRequest):
-    """
-    1. Inference with LLM
-    2. Save log to SQLite
-    3. Generate reply text (TTS audio is requested separately or as Base64?
-       Let's return reply_text and frontend can call /api/tts/ or we combine.
-       To reduce latency, let's just return reply_text for now and add TTS endpoint.
-    )
-    """
-    reply_text = engine.generate_reply(request.history, request.text)
+    result = engine.generate_reply(request.history, request.text)
+    reply_text = result["reply"]
+    emotion = result["emotion"]
+
     insert_log(request.session_id, request.text, reply_text)
 
     return {
         "status": "success",
-        "reply_text": reply_text
+        "reply_text": reply_text,
+        "emotion": emotion
     }
 
 @app.get("/api/tts", dependencies=[Depends(verify_shared_secret)])
@@ -86,19 +82,42 @@ async def tts(text: str):
 @app.post("/api/admin/train")
 async def trigger_manual_train(authorization: str = Header(...)):
     """
-    Manually trigger data export and notify admin.
-    Secured by MASTER_SECRET (Admin Only).
+    1. Run log export.
+    2. Trigger GitHub Actions via Repository Dispatch.
+    Secured by MASTER_SECRET.
     """
     if authorization != f"Bearer {MASTER_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        # Run export script
-        result = subprocess.run(
+        # 1. Export Logs
+        export_result = subprocess.run(
             ["python3", "backend/scripts/export_logs.py"],
             capture_output=True, text=True, check=True
         )
-        return {"status": "success", "message": "Log export successful. Ready for training.", "output": result.stdout}
+
+        # 2. Trigger GHA (Optional if secrets are set)
+        repo = os.getenv("GITHUB_REPO") # e.g. "user/repo"
+        token = os.getenv("GITHUB_TOKEN")
+
+        gha_status = "skipped (no GITHUB_TOKEN)"
+        if repo and token:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"https://api.github.com/repos/{repo}/dispatches",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    json={"event_type": "manual_train"}
+                )
+                gha_status = f"triggered (Status: {response.status_code})"
+
+        return {
+            "status": "success",
+            "message": f"Log export complete. GHA {gha_status}.",
+            "export_output": export_result.stdout
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -126,7 +145,10 @@ async def reload_lora(authorization: str = Header(...)):
 # Add a combined endpoint if we want lower latency (Text + Base64 Audio)
 @app.post("/api/chat_full", dependencies=[Depends(verify_shared_secret)])
 async def chat_full(request: ChatRequest):
-    reply_text = engine.generate_reply(request.history, request.text)
+    result = engine.generate_reply(request.history, request.text)
+    reply_text = result["reply"]
+    emotion = result["emotion"]
+
     insert_log(request.session_id, request.text, reply_text)
 
     try:
@@ -136,6 +158,7 @@ async def chat_full(request: ChatRequest):
         return {
             "status": "success",
             "reply_text": reply_text,
+            "emotion": emotion,
             "audio": audio_base64
         }
     except Exception as e:

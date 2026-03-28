@@ -68,9 +68,12 @@ class LLMEngine:
         print("Reloading model with new LoRA...")
         self.load_model()
 
-    def generate_reply(self, history: List[Dict[str, str]], user_text: str) -> str:
+    def generate_reply(self, history: List[Dict[str, str]], user_text: str) -> Dict[str, str]:
         if self.llm is None:
-            return "（ごめん、ボクの頭の準備がまだできてないみたいだ。ちょっと待ってね！）"
+            return {
+                "reply": "（ごめん、ボクの頭の準備がまだできてないみたいだ。ちょっと待ってね！）",
+                "emotion": "sorrow"
+            }
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         # Append history (limited to avoid ctx overflow)
@@ -85,7 +88,21 @@ class LLMEngine:
         )
 
         reply = response["choices"][0]["message"]["content"]
-        return reply
+
+        # Simple heuristic for emotion detection
+        emotion = "neutral"
+        joy_words = ["嬉しい", "楽しい", "やった", "おめでとう", "すごい", "！", "笑"]
+        sorrow_words = ["悲しい", "困った", "難しい", "できない", "ごめん", "うーん"]
+        angry_words = ["ダメ", "嫌い", "怒", "違う"]
+
+        if any(w in reply for w in joy_words): emotion = "joy"
+        elif any(w in reply for w in sorrow_words): emotion = "sorrow"
+        elif any(w in reply for w in angry_words): emotion = "angry"
+
+        return {
+            "reply": reply,
+            "emotion": emotion
+        }
 
 # Singleton instance
 engine = LLMEngine()

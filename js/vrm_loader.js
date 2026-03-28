@@ -16,6 +16,9 @@ export class VRMLoader {
         this.blinkTimer = 0;
         this.blinkInterval = 3 + Math.random() * 2; // Random blink interval
         this.isSpeaking = false;
+        this.isLeaning = false;
+        this.currentEmotion = 'neutral';
+        this.emotionTimer = 0;
 
         this.init();
     }
@@ -105,9 +108,17 @@ export class VRMLoader {
     updateProceduralAnimations(delta) {
         if (!this.vrm) return;
 
+        // Emotional expression timeout
+        if (this.currentEmotion !== 'neutral') {
+            this.emotionTimer += delta;
+            if (this.emotionTimer > 5) { // Reset after 5 seconds
+                this.setEmotion('neutral');
+            }
+        }
+
         // Breathing
         const breathAmount = 0.05 * Math.sin(this.clock.elapsedTime * 1.5);
-        this.vrm.humanoid.getNormalizedBoneNode('chest').rotation.x = breathAmount * 0.2;
+        this.vrm.humanoid.getNormalizedBoneNode('chest').rotation.x = breathAmount * 0.2 + (this.isLeaning ? 0.1 : 0);
 
         // Blinking
         this.blinkTimer += delta;
@@ -137,5 +148,29 @@ export class VRMLoader {
 
     setSpeaking(speaking) {
         this.isSpeaking = speaking;
+        this.isLeaning = speaking;
+    }
+
+    setLeaning(leaning) {
+        this.isLeaning = leaning;
+    }
+
+    setEmotion(emotion) {
+        if (!this.vrm) return;
+        this.currentEmotion = emotion;
+        this.emotionTimer = 0;
+
+        // Reset all expressions first
+        ['joy', 'sorrow', 'angry', 'surprised'].forEach(key => {
+            this.vrm.expressionManager.setValue(key, 0);
+        });
+
+        // Set new one
+        switch(emotion) {
+            case 'joy': this.vrm.expressionManager.setValue('joy', 0.8); break;
+            case 'sorrow': this.vrm.expressionManager.setValue('sorrow', 0.8); break;
+            case 'angry': this.vrm.expressionManager.setValue('angry', 0.8); break;
+            case 'surprised': this.vrm.expressionManager.setValue('surprised', 0.8); break;
+        }
     }
 }
