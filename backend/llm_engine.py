@@ -24,58 +24,76 @@ SYSTEM_PROMPT = """あなたは中学生のユーザーの隣の席に座る、�
 - 完璧なAIではなく、友達として一緒に悩み、喜び、考え、時には間違えたり言い直したりする愛嬌のある性格。
 - 英語で話しかけられたら、中学生レベルの英語で頑張って返そうとする（たまに間違えて言い直す）。
 - 相談相手として、ユーザーに寄り添うこと。
+
+【長期記憶（心のノート）】
+以下の情報は、これまでの会話からボクが覚えている大切なことだよ。会話に活かしてね：
+{memory_text}
 """
 
 class LLMEngine:
     def __init__(self):
         self.llm = None
+        self.current_adapter = None
         self.load_model()
 
-    def load_model(self):
-        print(f"Loading base model from {MODEL_PATH}...")
-        if not os.path.exists(MODEL_PATH):
-            print(f"Warning: Base model {MODEL_PATH} not found. LLM will not work until model is placed.")
+    def load_model(self, subject: str = "general"):
+        """
+        Load or switch to a subject-specific LoRA adapter.
+        AI自体は一つだが、教科ごとに学習内容（LoRA）を使い分ける。
+        """
+        # Path for subject-specific LoRA
+        # models/active_lora/math/, models/active_lora/japanese/, etc.
+        specific_lora_path = os.path.join(LORA_PATH, subject)
+        lora_file = os.path.join(specific_lora_path, "adapter_model.safetensors")
+
+        # If already loaded the correct adapter, skip (unless reload forced)
+        if self.llm and self.current_adapter == subject:
             return
 
-        # Check if LoRA exists
-        lora_base = os.path.join(LORA_PATH, "adapter_model.safetensors")
-        if os.path.exists(lora_base):
-            print(f"LoRA found at {LORA_PATH}. Loading model with LoRA...")
-            # llama-cpp-python handles lora via 'lora_path'
-            # Note: For multiple adapters or dynamic reloading, llama-cpp-python has specific methods.
+        print(f"Switching to subject: {subject}...")
+
+        # In this implementation, we re-init the Llama object for the subject.
+        # Note: llama-cpp-python's internal caching usually makes this fast if base model is in RAM.
+        if os.path.exists(lora_file):
+            print(f"Loading {subject} adapter from {specific_lora_path}")
             self.llm = Llama(
                 model_path=MODEL_PATH,
-                lora_path=LORA_PATH, # Some versions expect directory, some expect file
-                n_gpu_layers=N_GPU_LAYERS,
-                n_ctx=4096,
-                chat_format="llama-3" # Optimized for Llama-3-Instruct
-            )
-        else:
-            print("No LoRA found. Loading base model only.")
-            self.llm = Llama(
-                model_path=MODEL_PATH,
+                lora_path=specific_lora_path,
                 n_gpu_layers=N_GPU_LAYERS,
                 n_ctx=4096,
                 chat_format="llama-3"
             )
+        else:
+            print(f"No specific adapter for {subject}. Using base model.")
+            # Fallback to general LoRA if exists
+            general_lora = os.path.join(LORA_PATH, "general", "adapter_model.safetensors")
+            if os.path.exists(general_lora):
+                 self.llm = Llama(model_path=MODEL_PATH, lora_path=os.path.join(LORA_PATH, "general"), n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-3")
+            else:
+                 self.llm = Llama(model_path=MODEL_PATH, n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-3")
+
+        self.current_adapter = subject
 
     def reload_lora(self):
-        """
-        Reload the LoRA adapter without restarting the server.
-        llama-cpp-python might need a fresh init or specific method.
-        For simplicity, we re-init the engine.
-        """
-        print("Reloading model with new LoRA...")
-        self.load_model()
+        """Called by Webhook after new weights are pushed."""
+        print("Reloading current adapter...")
+        self.load_model(self.current_adapter)
 
-    def generate_reply(self, history: List[Dict[str, str]], user_text: str) -> Dict[str, str]:
+    def generate_reply(self, history: List[Dict[str, str]], user_text: str, subject: str = "general", memories: Dict[str, str] = {}) -> Dict[str, str]:
+        # Dynamic switch if subject changed
+        if self.current_adapter != subject:
+            self.load_model(subject)
+
         if self.llm is None:
             return {
                 "reply": "（ごめん、ボクの頭の準備がまだできてないみたいだ。ちょっと待ってね！）",
                 "emotion": "sorrow"
             }
 
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        memory_text = "\n".join([f"- {k}: {v}" for k, v in memories.items()]) if memories else "（まだ特になし）"
+        system_prompt = SYSTEM_PROMPT.format(memory_text=memory_text)
+
+        messages = [{"role": "system", "content": system_prompt}]
         # Append history (limited to avoid ctx overflow)
         messages.extend(history[-10:])
         messages.append({"role": "user", "content": user_text})
@@ -103,6 +121,21 @@ class LLMEngine:
             "reply": reply,
             "emotion": emotion
         }
+
+    def extract_memories(self, user_text: str, ai_reply: str) -> Dict[str, str]:
+        """
+        Extract key facts from the conversation to store in the notebook.
+        In a real scenario, this would be a second LLM call.
+        For now, we'll use a placeholder or simple logic.
+        """
+        # Example: if "ボクの名前はXXXです" is in user_text, extract XXX
+        import re
+        memories = {}
+        name_match = re.search(r"ボクの名前は(.+?)(です|だよ|だぞ|$)", user_text)
+        if name_match:
+            memories["user_name"] = name_match.group(1).strip()
+
+        return memories
 
 # Singleton instance
 engine = LLMEngine()

@@ -11,8 +11,12 @@ class MiikunApp {
         this.waveform = document.getElementById('waveform');
         this.statusText = document.getElementById('status-text');
         this.loadingIndicator = document.getElementById('loading-indicator');
+        this.subjectSelector = document.getElementById('subject-selector');
+        this.subjectBadge = document.getElementById('subject-badge');
 
         this.vrmLoader = new VRMLoader('miikun-canvas');
+        this.vrmLoader.onReaction = (type) => this.handlePhysicalInteraction(type);
+
         this.audioIO = new AudioIO();
         this.history = [];
 
@@ -60,6 +64,15 @@ class MiikunApp {
             if (state.getState() === AppState.IDLE) {
                 this.startSession();
             }
+        });
+
+        this.subjectSelector.addEventListener('change', (e) => {
+            const subject = e.target.value;
+            state.setSubject(subject);
+            this.subjectBadge.innerText = `CLASS: ${subject.toUpperCase()}`;
+            this.history = []; // Reset history for new subject session
+            this.chatContainer.innerHTML = ''; // Clear chat for new session
+            this.addMessage('miikun', `ボク、今は${e.target.options[e.target.selectedIndex].text}モードだよ。何でも聞いてね！`);
         });
 
         // Add Welcome Message (Optional)
@@ -121,8 +134,8 @@ class MiikunApp {
         try {
             state.setState(AppState.THINKING);
 
-            // Get reply and audio from API (using combined endpoint for better performance)
-            const result = await chatFull(state.sessionId, text, this.history);
+            // Get reply and audio from API
+            const result = await chatFull(state.sessionId, text, this.history, state.currentSubject);
 
             if (result.status === 'success') {
                 this.addMessage('miikun', result.reply_text);
@@ -173,6 +186,18 @@ class MiikunApp {
         });
     }
 
+    handlePhysicalInteraction(type) {
+        if (state.getState() !== AppState.IDLE) return;
+
+        const reactions = type === 'head'
+            ? ["わわっ！びっくりしたー！", "な、なでなで？照れるなあ...", "あはは、くすぐったいよ！"]
+            : ["ん？どうしたの？", "ボクに何か用？", "えへへ、遊んでくれるの？"];
+
+        const text = reactions[Math.floor(Math.random() * reactions.length)];
+        this.addMessage('miikun', text);
+        this.audioIO.playTts(null, text); // Play via native TTS for instant reaction
+    }
+
     handleError(error) {
         console.error("App Error:", error);
         const div = document.createElement('div');
@@ -186,4 +211,15 @@ class MiikunApp {
 // Start App
 document.addEventListener('DOMContentLoaded', () => {
     new MiikunApp();
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+                console.log('SW registered:', reg);
+            }).catch(err => {
+                console.log('SW registration failed:', err);
+            });
+        });
+    }
 });

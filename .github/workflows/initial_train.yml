@@ -24,6 +24,10 @@ jobs:
         run: |
           pip install -r backend/requirements_train.txt
 
+      - name: Scrape Educational Data
+        run: |
+          python3 backend/scripts/scrape_educational_data.py
+
       - name: Export Initial Logs from VPS (Optional)
         if: env.VPS_HOST != ''
         uses: appleboy/ssh-action@v1.2.1

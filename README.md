@@ -10,21 +10,16 @@
 - **Engine**: [VOICEVOX Engine](https://github.com/VOICEVOX/voicevox_engine)
 - **Runtime**: Python 3.10+, Node.js (ブラウザ閲覧用)
 
-### 2. クイックスタート (Docker Compose 推奨)
-GPU環境がある場合、Docker Compose を使うのが最も簡単です。
+### 2. かんたんセットアップ (推奨)
+VPS（Ubuntu 22.04 LTS）上で以下のコマンドを実行するだけで、対話形式でセットアップが完了します。
 
 ```bash
 git clone https://github.com/your-username/miikun-core.git
 cd miikun-core
-cp backend/.env.example backend/.env
-
-# .env を編集
-# ALLOWED_ORIGINS に自分のドメインを記載してください
-# MASTER_SECRET, WEBHOOK_SECRET を安全な文字列に変更してください
-
-# 起動
-docker-compose -f backend/infra/docker-compose.yml up -d
+python3 backend/scripts/setup_vps.py
 ```
+
+このスクリプトは、`.env` の生成、Nginx の設定、Systemd サービスへの登録、依存パッケージのインストールをすべて自動で行います。
 
 ### 3. Ubuntu 22.04 LTS での手動セットアップ詳細
 
@@ -101,8 +96,10 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 1. **対話ログの蓄積**: 日々の会話は `backend/data/logs.db` に保存されます。
 2. **週次データ抽出**: 毎週日曜 AM3:00（JST）、GitHub Actions が起動し、VPS 上の `backend/scripts/export_logs.py` を呼び出します。
    - **セーフティガード**: 新規ログが **50件以上** ある場合のみ、学習用の `train_data.jsonl` を生成します。
-3. **クラウド学習 (LoRA)**: 生成されたデータは GitHub Actions ランナーへ転送され、GPU を用いて LoRA（Low-Rank Adaptation）学習が実行されます。
-   - ベースモデル（Llama-3-8B等）の知識を保ちつつ、直近の会話傾向を微調整します。
+ 3. **多モデル審議 (Deliberation)**: 生成されたデータは、学習前にローカル LLM による厳格な審議にかけられます。
+    - 「中学生向けの教育データとして正確か？」をチェックし、合格したデータのみを抽出します。
+ 4. **クラウド学習 (LoRA)**: 検証済みのデータを用いて、教科ごとに独立した LoRA アダプタを作成します。
+    - ベースモデルの知識を保ちつつ、各教科の専門性を高めます。
 4. **自動デプロイと反映**:
    - 新しい学習済み重み（`models/active_lora`）がリポジトリに push されます。
    - その後、VPS の `/api/webhook/reload` エンドポイントが叩かれます。

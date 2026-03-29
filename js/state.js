@@ -10,6 +10,7 @@ class StateManager {
         this.currentState = AppState.IDLE;
         this.listeners = [];
         this.sessionId = this._getOrCreateSessionId();
+        this.currentSubject = 'general';
     }
 
     _getOrCreateSessionId() {
@@ -37,6 +38,11 @@ class StateManager {
 
     notify(state) {
         this.listeners.forEach(cb => cb(state));
+    }
+
+    setSubject(subject) {
+        this.currentSubject = subject;
+        this.notify(this.currentState); // Refresh UI if needed
     }
 }
 

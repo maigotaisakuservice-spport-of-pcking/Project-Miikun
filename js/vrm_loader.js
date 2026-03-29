@@ -56,7 +56,54 @@ export class VRMLoader {
             this.camera.updateProjectionMatrix();
         });
 
+        // Click interaction
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
+
         this.animate();
+    }
+
+    onCanvasClick(event) {
+        if (!this.vrm) return;
+
+        // Calculate mouse position in normalized device coordinates (-1 to +1)
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.vrm.scene.children, true);
+
+        if (intersects.length > 0) {
+            const hitNode = intersects[0].object;
+            console.log("Hit:", hitNode.name);
+
+            // Check if head or upper body was hit
+            if (hitNode.name.toLowerCase().includes('head') || hitNode.name.toLowerCase().includes('face')) {
+                this.triggerReaction('head');
+            } else {
+                this.triggerReaction('body');
+            }
+        }
+    }
+
+    triggerReaction(type) {
+        if (this.onReaction) {
+            this.onReaction(type);
+        }
+
+        // Visual feedback
+        if (type === 'head') {
+            this.setEmotion('surprised');
+            // Slight head shake
+            const head = this.vrm.humanoid.getNormalizedBoneNode('head');
+            if (head) {
+                head.rotation.y = 0.5;
+                setTimeout(() => head.rotation.y = 0, 500);
+            }
+        } else {
+            this.setEmotion('joy');
+        }
     }
 
     async loadVRM(url) {

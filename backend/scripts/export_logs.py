@@ -16,29 +16,30 @@ def export_logs():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Get unused logs
-    cursor.execute("SELECT id, user_text, ai_text FROM chat_logs WHERE is_used_for_training = 0")
-    rows = cursor.fetchall()
+    # Get subjects that have new logs
+    cursor.execute("SELECT DISTINCT subject FROM chat_logs WHERE is_used_for_training = 0")
+    subjects = [row["subject"] for row in cursor.fetchall()]
 
-    if len(rows) < 50:
-        print(f"Skipping export: Only {len(rows)} new logs found (Need 50+).")
-        sys.exit(0)
+    for subject in subjects:
+        cursor.execute("SELECT id, user_text, ai_text FROM chat_logs WHERE subject = ? AND is_used_for_training = 0", (subject,))
+        rows = cursor.fetchall()
 
-    print(f"Exporting {len(rows)} logs for training...")
+        if len(rows) < 10: # Lower limit per subject
+            continue
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for row in rows:
-            # Format for SFTTrainer
-            # Standard: {"text": "### User: ...\n### Assistant: ..."}
-            # Or ChatML: {"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
-            data = {
-                "text": f"### User: {row['user_text']}\n### Assistant: {row['ai_text']}"
-            }
-            f.write(json.dumps(data, ensure_ascii=False) + "\n")
+        print(f"Exporting {len(rows)} logs for subject: {subject}")
+        output_file = os.path.join(os.path.dirname(__file__), "..", "..", f"train_data_{subject}.jsonl")
 
-    # Mark as used
-    ids = [row["id"] for row in rows]
-    cursor.execute(f"UPDATE chat_logs SET is_used_for_training = 1 WHERE id IN ({','.join(['?']*len(ids))})", ids)
+        with open(output_file, "w", encoding="utf-8") as f:
+            for row in rows:
+                data = {
+                    "text": f"### Subject: {subject}\n### User: {row['user_text']}\n### Assistant: {row['ai_text']}"
+                }
+                f.write(json.dumps(data, ensure_ascii=False) + "\n")
+
+        # Mark as used
+        ids = [row["id"] for row in rows]
+        cursor.execute(f"UPDATE chat_logs SET is_used_for_training = 1 WHERE id IN ({','.join(['?']*len(ids))})", ids)
     conn.commit()
     conn.close()
 

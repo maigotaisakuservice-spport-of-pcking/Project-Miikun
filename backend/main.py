@@ -8,7 +8,7 @@ import subprocess
 import os
 from dotenv import load_dotenv
 
-from .db import init_db, insert_log
+from .db import init_db, insert_log, get_memories, update_memory
 from .llm_engine import engine
 from .tts_engine import generate_voice
 
@@ -34,6 +34,7 @@ app.add_middleware(
 # Models for Request/Response
 class ChatRequest(BaseModel):
     session_id: str
+    subject: str = "general"
     text: str
     history: List[Dict[str, str]] = []
 
@@ -55,11 +56,12 @@ async def health():
 
 @app.post("/api/chat", dependencies=[Depends(verify_shared_secret)])
 async def chat(request: ChatRequest):
-    result = engine.generate_reply(request.history, request.text)
+    memories = get_memories(request.session_id, request.subject)
+    result = engine.generate_reply(request.history, request.text, subject=request.subject, memories=memories)
     reply_text = result["reply"]
     emotion = result["emotion"]
 
-    insert_log(request.session_id, request.text, reply_text)
+    insert_log(request.session_id, request.subject, request.text, reply_text)
 
     return {
         "status": "success",
@@ -145,11 +147,17 @@ async def reload_lora(authorization: str = Header(...)):
 # Add a combined endpoint if we want lower latency (Text + Base64 Audio)
 @app.post("/api/chat_full", dependencies=[Depends(verify_shared_secret)])
 async def chat_full(request: ChatRequest):
-    result = engine.generate_reply(request.history, request.text)
+    memories = get_memories(request.session_id, request.subject)
+    result = engine.generate_reply(request.history, request.text, subject=request.subject, memories=memories)
     reply_text = result["reply"]
     emotion = result["emotion"]
 
-    insert_log(request.session_id, request.text, reply_text)
+    insert_log(request.session_id, request.subject, request.text, reply_text)
+
+    # Memory extraction
+    new_memories = engine.extract_memories(request.text, reply_text)
+    for k, v in new_memories.items():
+        update_memory(request.session_id, request.subject, k, v)
 
     try:
         audio_data = await generate_voice(reply_text)

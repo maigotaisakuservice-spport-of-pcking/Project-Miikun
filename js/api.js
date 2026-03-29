@@ -3,7 +3,7 @@
 const SHARED_SECRET = "miikun_shared_pass";
 const BASE_URL = "/api";
 
-export async function chat(sessionId, text, history) {
+export async function chat(sessionId, text, history, subject = "general") {
     const response = await fetch(`${BASE_URL}/chat`, {
         method: "POST",
         headers: {
@@ -12,6 +12,7 @@ export async function chat(sessionId, text, history) {
         },
         body: JSON.stringify({
             session_id: sessionId,
+            subject: subject,
             text: text,
             history: history
         })
@@ -41,7 +42,7 @@ export async function getTtsAudio(text) {
 }
 
 // Full endpoint (text + audio) for better performance
-export async function chatFull(sessionId, text, history) {
+export async function chatFull(sessionId, text, history, subject = "general") {
     const response = await fetch(`${BASE_URL}/chat_full`, {
         method: "POST",
         headers: {
@@ -50,6 +51,7 @@ export async function chatFull(sessionId, text, history) {
         },
         body: JSON.stringify({
             session_id: sessionId,
+            subject: subject,
             text: text,
             history: history
         })
