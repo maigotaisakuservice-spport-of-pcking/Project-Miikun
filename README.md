@@ -19,7 +19,11 @@ cd miikun-core
 python3 backend/scripts/setup_vps.py
 ```
 
-このスクリプトは、`.env` の生成、Nginx の設定、Systemd サービスへの登録、依存パッケージのインストールをすべて自動で行います。
+このスクリプトは、以下の工程をすべて自動化します：
+- **環境設定**: ドメイン、ディレクトリ、ユーザー、シークレット等の対話的入力。
+- **.env生成**: 入力に基づいた最適な設定ファイルの作成。
+- **システム構築**: Nginx, Docker, Python 仮想環境の自動セットアップ。
+- **インフラ設定**: Nginx 逆プロキシ、Systemd デーモン登録の自動構成。
 
 ### 3. Ubuntu 22.04 LTS での手動セットアップ詳細
 
@@ -70,13 +74,17 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 
 | Secret 名 | 内容 | 例 |
 | :--- | :--- | :--- |
-| `VPS_HOST` | VPS の IP アドレスまたはドメイン | `123.456.78.90` |
-| `VPS_USER` | SSH 接続に使用するユーザー名 | `ubuntu` |
-| `VPS_SSH_KEY` | VPS への SSH 秘密鍵 (id_rsa の中身) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `VPS_URL` | バックエンド API のベース URL (SSL推奨) | `https://your-domain.com` |
-| `HF_TOKEN` | Hugging Face のアクセストークン (Read権限) | `hf_xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `HF_BASE_MODEL` | 使用するベースモデルのパス | `elyza/ELYZA-japanese-Llama-3-8B-Instruct` |
-| `WEBHOOK_SECRET` | リロード用シークレット (backend/.env と一致させる) | `your_secure_random_string` |
+| Secret 名 | 取得方法・内容 |
+| :--- | :--- |
+| `VPS_HOST` | VPS の IP アドレス（またはドメイン）。契約したクラウドサービスの管理画面で確認できます。 |
+| `VPS_USER` | VPS ログイン用のユーザー名（例: `ubuntu`, `root`）。 |
+| `VPS_SSH_KEY` | ローカルの `~/.ssh/id_rsa` 等の中身。未作成なら `ssh-keygen` で作成し、公開鍵を VPS の `~/.ssh/authorized_keys` に登録してください。 |
+| `VPS_URL` | あなたが取得したドメイン名（例: `https://miikun.com`）。マイク利用のため **HTTPS** が必須です。 |
+| `HF_TOKEN` | [Hugging Face サイト](https://huggingface.co/settings/tokens)で作成できます。 |
+| `HF_BASE_MODEL` | 使用したいモデルのパス（例: `elyza/ELYZA-japanese-Llama-3-8B-Instruct`）。 |
+| `WEBHOOK_SECRET` | `setup_vps.py` 実行時に生成（または入力）した、デプロイ用の任意の長い文字列です。 |
+| `GITHUB_REPO` | 自身のリポジトリ名（例: `username/miikun-core`）。 |
+| `GITHUB_TOKEN` | [GitHub Settings > Developer settings](https://github.com/settings/tokens) で作成する **Personal Access Token (classic)** です。`repo` と `workflow` の権限が必要です。 |
 
 ## 🔐 🔐 セキュリティ設定
 - **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。

@@ -2,6 +2,7 @@ import os
 import secrets
 import subprocess
 import sys
+import getpass
 
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -26,23 +27,38 @@ def setup():
     print("==========================================")
     print("\nThis script will guide you through the setup process.\n")
 
-    # 1. Gather Configuration
-    domain = get_input("Enter your domain (e.g., miikun.com)", "localhost")
-    shared_secret = get_input("Enter a Shared Secret for Frontend", secrets.token_hex(16))
-    master_secret = get_input("Enter a Master Secret for Admin", secrets.token_hex(16))
-    webhook_secret = get_input("Enter a Webhook Secret for Deployment", secrets.token_hex(16))
-    github_repo = get_input("Enter your GitHub repo (user/repo)", "user/repo")
-    github_token = get_input("Enter your GitHub PAT (for Repository Dispatch)", "ghp_xxxx")
+    # 1. Gather System Information
+    install_dir = os.getcwd()
+    current_user = getpass.getuser()
+
+    install_dir = get_input("Installation Directory", install_dir)
+    user_name = get_input("Linux User Name (for Systemd)", current_user)
+    domain = get_input("Domain Name (e.g., miikun.com)", "localhost")
+
+    print("\n--- API & Security ---")
+    shared_secret = get_input("Shared Secret for Frontend Handshake", secrets.token_hex(16))
+    master_secret = get_input("Master Secret for Admin Access", secrets.token_hex(16))
+    webhook_secret = get_input("Webhook Secret for Deployment", secrets.token_hex(16))
+
+    print("\n--- GitHub Integration ---")
+    github_repo = get_input("GitHub Repo (user/repo)", "user/repo")
+    github_token = get_input("GitHub Personal Access Token", "ghp_xxxx")
+
+    print("\n--- Voice Settings ---")
+    print("Common VOICEVOX Speaker IDs:")
+    print("  13: 栗田まろん (Recommended: Young Boy)")
+    print("  8: 春日部つむぎ (Girl)")
+    speaker_id = get_input("VOICEVOX Speaker ID", "13")
 
     # 2. Generate .env
     env_content = f"""SHARED_SECRET={shared_secret}
-ALLOWED_ORIGINS=https://{domain},http://localhost:8080
+ALLOWED_ORIGINS=https://{domain},http://localhost:8080,http://{domain}
 WEBHOOK_SECRET={webhook_secret}
 MASTER_SECRET={master_secret}
 GITHUB_REPO={github_repo}
 GITHUB_TOKEN={github_token}
 VOICEVOX_URL=http://localhost:50021
-SPEAKER_ID=13
+SPEAKER_ID={speaker_id}
 MODEL_PATH=models/base_model.gguf
 LORA_PATH=models/active_lora/
 N_GPU_LAYERS=-1
@@ -51,23 +67,25 @@ N_GPU_LAYERS=-1
         f.write(env_content)
     print("\n[✓] backend/.env generated.")
 
-    # 3. Environment Checks & System Setup
-    is_ubuntu = run_cmd("grep -q 'Ubuntu' /etc/os-release")
-    if not is_ubuntu:
-        print("\n[!] Warning: This script is optimized for Ubuntu 22.04 LTS.")
-        cont = get_input("Continue anyway? (y/n)", "n")
-        if cont.lower() != 'y': sys.exit(0)
-
+    # 3. System Dependencies
     print("\n--- Installing System Dependencies ---")
     run_cmd("sudo apt update")
     run_cmd("sudo apt install -y nginx docker.io docker-compose python3-venv certbot python3-certbot-nginx")
 
-    # 4. Configure Nginx
+    # 4. Python Environment
+    print("\n--- Setting up Python Virtual Environment ---")
+    if not os.path.exists("venv"):
+        run_cmd("python3 -m venv venv")
+    run_cmd(f"{install_dir}/venv/bin/pip install -r backend/requirements.txt")
+
+    # 5. Configure Nginx
     print("\n--- Configuring Nginx ---")
-    nginx_conf_path = "backend/infra/nginx.conf"
-    if os.path.exists(nginx_conf_path):
-        with open(nginx_conf_path, "r") as f:
-            conf = f.read().replace("your-domain.com", domain)
+    nginx_template = "backend/infra/nginx.conf"
+    if os.path.exists(nginx_template):
+        with open(nginx_template, "r") as f:
+            conf = f.read()
+            conf = conf.replace("{{DOMAIN}}", domain)
+            conf = conf.replace("{{INSTALL_DIR}}", install_dir)
 
         tmp_conf = "/tmp/miikun_nginx.conf"
         with open(tmp_conf, "w") as f:
@@ -79,25 +97,36 @@ N_GPU_LAYERS=-1
         run_cmd("sudo nginx -t && sudo systemctl restart nginx")
         print("[✓] Nginx configured.")
 
-    # 5. Setup Systemd Service
+    # 6. Setup Systemd Service
     print("\n--- Configuring Systemd ---")
-    service_path = "backend/infra/miikun.service"
-    if os.path.exists(service_path):
-        run_cmd(f"sudo cp {service_path} /etc/systemd/system/miikun.service")
+    service_template = "backend/infra/miikun.service"
+    if os.path.exists(service_template):
+        with open(service_template, "r") as f:
+            service = f.read()
+            service = service.replace("{{USER}}", user_name)
+            service = service.replace("{{INSTALL_DIR}}", install_dir)
+
+        tmp_service = "/tmp/miikun.service"
+        with open(tmp_service, "w") as f:
+            f.write(service)
+
+        run_cmd(f"sudo cp {tmp_service} /etc/systemd/system/miikun.service")
         run_cmd("sudo systemctl daemon-reload")
         run_cmd("sudo systemctl enable miikun")
         print("[✓] Systemd service registered.")
 
-    # 6. Final Steps
+    # 7. Final Steps
     print("\n==========================================")
-    print("   Setup Complete! What's next?           ")
+    print("   Setup Complete! FINAL STEPS:           ")
     print("==========================================")
-    print(f"1. PLACE your VRM model at: assets/miikun.vrm")
-    print(f"2. PLACE your GGUF model at: backend/models/base_model.gguf")
-    print(f"3. RUN 'sudo systemctl start miikun' to start the backend.")
-    print(f"4. RUN 'sudo docker-compose -f backend/infra/docker-compose.yml up -d' for VOICEVOX.")
-    print(f"5. SETUP SSL with: sudo certbot --nginx -d {domain}")
-    print("\nEnjoy your Miikun Intelligence experience!")
+    print(f"1. PLACE your VRM model at: {install_dir}/assets/miikun.vrm")
+    print(f"2. PLACE your GGUF model at: {install_dir}/models/base_model.gguf")
+    print(f"3. START Backend: sudo systemctl start miikun")
+    print(f"4. START VOICEVOX: sudo docker-compose -f backend/infra/docker-compose.yml up -d")
+    if domain != "localhost":
+        print(f"5. SETUP SSL: sudo certbot --nginx -d {domain}")
+
+    print("\nWelcome to the future of learning with Miikun!")
 
 if __name__ == "__main__":
     if os.geteuid() == 0:
