@@ -114,9 +114,8 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 
 ## 🎨 🎨 ライセンスと帰属 (License & Attribution)
 - **System Code**: MIT License
-- **3D Model (`assets/miikun.vrm`)**: [Meshy](https://www.meshy.ai/) で作成。 **CC BY 4.0** (Creative Commons Attribution 4.0 International) に基づき、帰属が必要です。
+- **TTS Engine**: VOICEVOX (音声モデル: 栗田まろん)。利用規約に従って使用してください。
 - **Base LLM**: Meta Llama-3 License に準拠します。
-- **TTS Engine**: VOICEVOX (利用規約に従ってください)。
 
 ---
 **Miikun Intelligence Project**
