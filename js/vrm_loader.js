@@ -4,6 +4,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 export class VRMLoader {
     constructor(canvasId) {
+        THREE.ColorManagement.enabled = true;
         this.canvas = document.getElementById(canvasId);
         this.renderer = null;
         this.scene = null;
@@ -33,6 +34,9 @@ export class VRMLoader {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        // Ensure ColorManagement is consistent
+        this.renderer.useLegacyLights = false;
 
         // Scene
         this.scene = new THREE.Scene();
@@ -126,7 +130,12 @@ export class VRMLoader {
                     resolve(vrm);
                 },
                 (progress) => {
-                    console.log('Loading VRM...', (progress.loaded / progress.total * 100), '%');
+                    if (progress.total > 0) {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        console.log(`Loading VRM... ${percent}%`);
+                    } else {
+                        console.log(`Loading VRM... ${Math.round(progress.loaded / 1024)} KB`);
+                    }
                 },
                 (error) => {
                     console.error('Error loading VRM:', error);
