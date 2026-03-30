@@ -49,9 +49,25 @@ python3 backend/scripts/setup_vps.py
   - **権利関係**: 本システムのボイスモデルを用いた機械学習や追加のファインチューニングは規約により禁止されています。
   - **3Dモデル**: 独自の VRoid モデルの使用は、VirVox プロジェクトの二次創作ガイドライン（キャラクターのイメージを損なわない範囲）に従い、個人の創作として許可されています。
 
-## 🔐 🔐 セキュリティ設定
+## 🔑 🔑 GitHub Secrets の登録
+GitHub Actions（初回学習やデプロイ）を正常に動作させるため、リポジトリの **Settings > Secrets and variables > Actions** から以下のシークレットを登録してください。
+
+| Secret 名 | 内容 | 確認方法・例 |
+| :--- | :--- | :--- |
+| `VPS_HOST` | VPS の IP アドレス | クラウドサービスの管理画面で確認 |
+| `VPS_USER` | VPS ログインユーザー名 | `ubuntu` や `root` など |
+| `VPS_SSH_KEY` | VPS 接続用の秘密鍵 | `~/.ssh/id_rsa` の中身（OpenSSH形式） |
+| `VPS_URL` | 公開ドメインのURL | `https://your-domain.com` (HTTPS必須) |
+| `WEBHOOK_SECRET` | デプロイ用秘密鍵 | **VPS上の `backend/.env` に記載されています** |
+| `HF_TOKEN` | Hugging Face トークン | [Hugging Face Settings](https://huggingface.co/settings/tokens) で生成 |
+| `HF_BASE_MODEL` | ベースモデルのパス | `elyza/ELYZA-japanese-Llama-2-7b-instruct` |
+| `GH_REPO` | 自身のリポジトリ名 | `username/miikun-core` |
+| `GH_PAT` | GitHub 個人アクセストークン | [GitHub Settings](https://github.com/settings/tokens) で `repo` 権限付きで生成 |
+
+## 🔐 🔐 セキュリティと詳細設定
 - **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。
-- **Webhook Secret**: `setup_vps.py` 実行時に生成される、デプロイおよびホットリロード用の秘密鍵です。
+- **VPS_URL**: 自身のドメインを登録してください。Web Speech API（マイク）を利用するには、ブラウザの仕様により **HTTPS（SSL化）** が必須条件となります。
+- **Webhook Secret**: `setup_vps.py` 実行時にランダム生成（または指定）され、VPSの環境変数ファイル（`.env`）に保存されます。この値を GitHub Actions のシークレットに登録することで、学習完了後の自動デプロイとモデルの即時反映（ホットリロード）が有効になります。
 
 ---
 **Miikun Intelligence Project**
