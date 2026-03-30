@@ -80,6 +80,26 @@
         VOICEVOX: 栗田まろん | AI Powered by Miikun Core
     </div>
 
+    <!-- Privacy Consent Modal -->
+    <div id="consent-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md hidden">
+        <div class="bg-white/95 p-8 rounded-3xl shadow-2xl max-w-md border border-white/20">
+            <h2 class="text-xl font-bold mb-4 text-slate-800">みーくんからのお願い 🎒</h2>
+            <div class="space-y-4 text-slate-600 leading-relaxed text-sm">
+                <p>
+                    ボクと一緒に勉強してくれてありがとう！<br>
+                    ボクがもっと賢くなってキミをサポートできるように、**ボクたちの会話の内容は自動的にボクの学習データとして使わせてもらうね。**
+                </p>
+                <p>
+                    利用を続けることで、この内容に同意したものとするよ。<br>
+                    （個人を特定できるような名前などは、学習の前にボクたちがしっかりチェックして除外するから安心してね！）
+                </p>
+            </div>
+            <button id="consent-btn" class="mt-8 w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-2xl transition-all shadow-lg active:scale-95">
+                わかったよ、同意する！
+            </button>
+        </div>
+    </div>
+
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -97,8 +97,8 @@ N_GPU_LAYERS=-1
         run_cmd("sudo nginx -t && sudo systemctl restart nginx")
         print("[✓] Nginx configured.")
 
-    # 6. Setup Systemd Service
-    print("\n--- Configuring Systemd ---")
+    # 6. Setup Systemd Service & Timers
+    print("\n--- Configuring Systemd & Weekly Cron ---")
     service_template = "backend/infra/miikun.service"
     if os.path.exists(service_template):
         with open(service_template, "r") as f:
@@ -114,6 +114,11 @@ N_GPU_LAYERS=-1
         run_cmd("sudo systemctl daemon-reload")
         run_cmd("sudo systemctl enable miikun")
         print("[✓] Systemd service registered.")
+
+    # 7. Setup Weekly Training Cron Task (Sunday AM3:00)
+    cron_job = f"0 3 * * 0 {install_dir}/venv/bin/python {install_dir}/backend/scripts/weekly_train_local.py >> {install_dir}/backend/data/weekly_train.log 2>&1"
+    run_cmd(f'(crontab -l 2>/dev/null; echo "{cron_job}") | crontab -')
+    print("[✓] Weekly Training Cron Task scheduled (Sundays AM3:00).")
 
     # 7. Final Steps
     print("\n==========================================")

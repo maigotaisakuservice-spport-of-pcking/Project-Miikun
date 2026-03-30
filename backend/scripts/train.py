@@ -42,9 +42,14 @@ def deliberate_and_filter(dataset, subject):
     for item in dataset:
         content = item["text"]
 
-        # Phase 1: Direct Quality Check
+        # Phase 1: Direct Quality Check & PII Filtering
         prompt1 = f"""以下の学習用データの内容を審議してください。
 この内容は中学生向けの教育データとして「正確」かつ「適切」ですか？
+
+【重要ルール: 個人情報の排除】
+- 歴史上の人物や有名な企業の社長以外の、一般人（生徒、先生など）の個人名らしきものが含まれている場合は、必ず 'NG' と判定してください。
+- 住所や電話番号などの個人情報が含まれている場合も 'NG' です。
+
 間違いや不適切な表現がある場合は 'NG'、問題ない場合は 'OK' とだけ答えてください。
 
 【データ】
@@ -55,9 +60,10 @@ def deliberate_and_filter(dataset, subject):
         res1 = evaluator.create_chat_completion(messages=[{"role": "user", "content": prompt1}], max_tokens=10, temperature=0.1)
         result1 = res1["choices"][0]["message"]["content"].strip().upper()
 
-        # Phase 2: Critical Review (Self-Correction Prompt)
-        prompt2 = f"""以下のデータについて、あなたは「間違いがある」と指摘しました。本当に間違いですか？
-もう一度冷静に確認し、もし教育上問題なければ 'OK'、やはりダメなら 'NG' と答えてください。
+        # Phase 2: Critical Review (Self-Correction & PII Re-check)
+        prompt2 = f"""以下のデータについて、あなたは「間違いがある」または「個人情報が含まれる」と指摘しました。本当にそう判定すべきですか？
+歴史上の人物以外の個人名などが含まれていないか、もう一度冷静に確認してください。
+もし教育上問題なく、かつ個人情報も含まれていない場合は 'OK'、やはりダメなら 'NG' と答えてください。
 【データ】: {content}
 【あなたの直前の判断】: {result1}
 再審議結果:"""
@@ -201,4 +207,15 @@ def train():
     print(f"Total training process finished in {elapsed:.2f} minutes.")
 
 if __name__ == "__main__":
-    train()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--subject", type=str, default=None)
+    parser.add_argument("--data", type=str, default=None)
+    args = parser.parse_args()
+
+    if args.subject and args.data:
+        # Single subject mode (used by parallel Actions)
+        train_subject(args.subject, args.data)
+    else:
+        # Batch mode (used by VPS)
+        train()

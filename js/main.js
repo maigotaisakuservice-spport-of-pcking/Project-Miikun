@@ -48,6 +48,19 @@ class MiikunApp {
     }
 
     async init() {
+        // Privacy Consent Check
+        const consent = localStorage.getItem('miikun-consent');
+        const modal = document.getElementById('consent-modal');
+        const consentBtn = document.getElementById('consent-btn');
+
+        if (!consent) {
+            modal.classList.remove('hidden');
+            consentBtn.addEventListener('click', () => {
+                localStorage.setItem('miikun-consent', 'true');
+                modal.classList.add('hidden');
+            });
+        }
+
         // Load VRM
         try {
             await this.vrmLoader.loadVRM('assets/miikun.vrm');
