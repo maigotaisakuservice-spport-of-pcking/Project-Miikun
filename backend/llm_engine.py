@@ -34,7 +34,14 @@ class LLMEngine:
     def __init__(self):
         self.llm = None
         self.current_adapter = None
-        self.load_model()
+        # Lazy loading or handle missing model at startup
+        try:
+            if os.path.exists(MODEL_PATH):
+                self.load_model()
+            else:
+                print(f"Warning: Model file not found at {MODEL_PATH}. Skipping initial load.")
+        except Exception as e:
+            print(f"Failed to load model on startup: {e}")
 
     def load_model(self, subject: str = "general"):
         """
@@ -61,28 +68,31 @@ class LLMEngine:
 
         print(f"Switching to subject: {subject}...")
 
-        # llama-cpp-python provides set_lora/apply_lora in some versions,
-        # but the most stable way for multi-lora is often swapping the adapter.
-        # Here we re-apply the adapter to the existing LLM instance.
+        # Note: Dynamic LoRA swapping is complex in llama-cpp.
+        # We perform a full re-initialization if the adapter changes to ensure clean weights.
+        # While slower than hot-swapping, it avoids "ghost weights" from previous adapters.
         try:
-            if os.path.exists(lora_file):
-                print(f"Applying LoRA adapter from {specific_lora_path}")
-                self.llm.set_lora_path(specific_lora_path)
-            else:
-                print(f"No specific adapter for {subject}. Using base model (removing LoRA).")
-                # Fallback to general or remove
+            target_lora = specific_lora_path if os.path.exists(lora_file) else None
+            if not target_lora:
                 general_lora_path = os.path.join(LORA_PATH, "general")
                 if os.path.exists(os.path.join(general_lora_path, "adapter_model.safetensors")):
-                    self.llm.set_lora_path(general_lora_path)
-                else:
-                    self.llm.set_lora_path(None)
+                    target_lora = general_lora_path
 
+            # Re-initialize only if necessary
+            print(f"Reloading model with adapter: {target_lora}")
+            self.llm = Llama(
+                model_path=MODEL_PATH,
+                lora_path=target_lora,
+                n_gpu_layers=N_GPU_LAYERS,
+                n_ctx=4096,
+                chat_format="llama-2",
+                verbose=False
+            )
             self.current_adapter = subject
         except Exception as e:
-            print(f"Error switching LoRA: {e}. Re-initializing model as fallback.")
-            # Fallback to full re-init if set_lora_path is not supported or fails
-            self.llm = Llama(model_path=MODEL_PATH, lora_path=specific_lora_path if os.path.exists(lora_file) else None, n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-2")
-            self.current_adapter = subject
+            print(f"Error switching LoRA: {e}. Re-initializing base model as fallback.")
+            self.llm = Llama(model_path=MODEL_PATH, n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-2")
+            self.current_adapter = "general"
 
     def reload_lora(self):
         """Called by Webhook after new weights are pushed."""
@@ -90,9 +100,16 @@ class LLMEngine:
         self.load_model(self.current_adapter)
 
     def generate_reply(self, history: List[Dict[str, str]], user_text: str, subject: str = "general", memories: Dict[str, str] = {}) -> Dict[str, str]:
-        # Dynamic switch if subject changed
-        if self.current_adapter != subject:
-            self.load_model(subject)
+        # Attempt to load model if it failed previously or subject changed
+        if self.llm is None or self.current_adapter != subject:
+            try:
+                self.load_model(subject)
+            except Exception as e:
+                print(f"Error loading model: {e}")
+                return {
+                    "reply": "（ごめん、ボクの頭の準備がまだできてないみたいだ。モデルファイルが見当たらないか、読み込み中にエラーが起きちゃった。管理者さんに確認してみてね！）",
+                    "emotion": "sorrow"
+                }
 
         if self.llm is None:
             return {

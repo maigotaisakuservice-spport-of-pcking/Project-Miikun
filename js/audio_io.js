@@ -5,6 +5,7 @@ export class AudioIO {
         this.recognition = null;
         this.isListening = false;
         this.onResultCallback = null;
+        this.onInterimResultCallback = null;
         this.onErrorCallback = null;
         this.audioElement = new Audio();
         this.audioElement.crossOrigin = "anonymous";
@@ -14,6 +15,8 @@ export class AudioIO {
         this.analyser = null;
         this.microphoneStream = null;
         this.sourceNode = null;
+
+        this.lastTranscript = "";
 
         this.setupRecognition();
     }
@@ -34,16 +37,33 @@ export class AudioIO {
 
         this.recognition = new SpeechRecognition();
         this.recognition.lang = 'ja-JP';
-        this.recognition.continuous = false;
-        this.recognition.interimResults = false;
+        this.recognition.continuous = true; // Changed to true for better toggle control
+        this.recognition.interimResults = true;
 
         this.recognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
-            if (this.onResultCallback) this.onResultCallback(text);
-            state.setState(AppState.THINKING);
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            if (finalTranscript) {
+                this.lastTranscript += finalTranscript;
+                if (this.onResultCallback) this.onResultCallback(this.lastTranscript, true);
+            }
+
+            if (interimTranscript && this.onInterimResultCallback) {
+                this.onInterimResultCallback(this.lastTranscript + interimTranscript);
+            }
         };
 
         this.recognition.onerror = (event) => {
+            if (event.error === 'no-speech') return; // Ignore no-speech error for continuous mode
             console.error("STT Error:", event.error);
             if (this.onErrorCallback) this.onErrorCallback(event.error);
             state.setState(AppState.IDLE);
@@ -51,21 +71,23 @@ export class AudioIO {
 
         this.recognition.onend = () => {
             this.isListening = false;
+            // If we ended but state is still LISTENING, it means it timed out or was auto-stopped
             if (state.getState() === AppState.LISTENING) {
-                state.setState(AppState.IDLE);
+                this.finishListening();
             }
         };
     }
 
-    async startListening(onResult, onError) {
+    async startListening(onResult, onInterim, onError) {
         if (!this.recognition) return;
         this.onResultCallback = onResult;
+        this.onInterimResultCallback = onInterim;
         this.onErrorCallback = onError;
+        this.lastTranscript = "";
 
         await this.initAudioContext();
 
         try {
-            // Setup Microphone for analysis
             if (!this.microphoneStream) {
                 this.microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const micSource = this.audioContext.createMediaStreamSource(this.microphoneStream);
@@ -85,6 +107,23 @@ export class AudioIO {
         }
     }
 
+    stopListening() {
+        if (this.recognition && this.isListening) {
+            this.recognition.stop();
+            this.isListening = false;
+            // Note: onend will be triggered, calling finishListening
+        }
+    }
+
+    finishListening() {
+        if (this.lastTranscript.trim()) {
+            if (this.onResultCallback) this.onResultCallback(this.lastTranscript, false);
+            state.setState(AppState.THINKING);
+        } else {
+            state.setState(AppState.IDLE);
+        }
+    }
+
     async playTts(audioUrl, fallbackText = null) {
         await this.initAudioContext();
 
@@ -98,7 +137,6 @@ export class AudioIO {
 
             this.audioElement.src = audioUrl;
 
-            // Connect Audio Element to Analyser (only once)
             if (!this.sourceNode) {
                 this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement);
                 this.sourceNode.connect(this.analyser);
@@ -137,7 +175,6 @@ export class AudioIO {
         });
     }
 
-    // Helper to check if currently speaking for lip-sync
     isSpeaking() {
         return !this.audioElement.paused && !this.audioElement.ended;
     }

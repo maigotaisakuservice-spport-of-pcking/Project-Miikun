@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VOICEVOX_URL = os.getenv("VOICEVOX_URL", "http://localhost:50021")
-SPEAKER_ID = int(os.getenv("SPEAKER_ID", "13")) # Default: Kurita Maron (Young Boy)
+SPEAKER_ID = int(os.getenv("SPEAKER_ID", "32")) # Default: Shirakami Kotaro (Wa-i)
 
 async def generate_voice(text: str) -> bytes:
     """

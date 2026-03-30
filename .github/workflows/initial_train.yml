@@ -8,6 +8,9 @@ on:
 jobs:
   prepare-data:
     runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
     outputs:
       subjects: ${{ steps.set-subjects.outputs.subjects }}
     steps:
@@ -79,6 +82,8 @@ jobs:
           path: models/active_lora/${{ matrix.subject }}
 
   deploy:
+    permissions:
+      contents: write
     needs: train
     runs-on: ubuntu-latest
     steps:
@@ -89,7 +94,7 @@ jobs:
         with:
           pattern: lora-*
           path: models/active_lora
-          merge-multiple: false # Keep each in its subfolder
+          merge-multiple: true # Flatten so we get models/active_lora/subject/adapter_model.bin
       - name: Push Initial LoRA Weights
         run: |
           git config --local user.email "action@github.com"

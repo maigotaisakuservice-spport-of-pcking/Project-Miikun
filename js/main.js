@@ -19,6 +19,7 @@ class MiikunApp {
 
         this.audioIO = new AudioIO();
         this.history = [];
+        this.currentInterimMessage = null;
 
         this.init();
         this.updateWaveform();
@@ -31,7 +32,6 @@ class MiikunApp {
         if (curState === AppState.LISTENING || curState === AppState.SPEAKING) {
             const data = this.audioIO.getVolumeData();
             if (data.length > 0) {
-                // Pick 5 samples for the 5 bars
                 const bars = this.waveform.querySelectorAll('div');
                 const indices = [10, 30, 50, 70, 90];
                 bars.forEach((bar, i) => {
@@ -41,14 +41,12 @@ class MiikunApp {
                 });
             }
         } else {
-            // Reset bars
             const bars = this.waveform.querySelectorAll('div');
             bars.forEach(bar => bar.style.transform = `scaleY(1)`);
         }
     }
 
     async init() {
-        // Privacy Consent Check
         const consent = localStorage.getItem('miikun-consent');
         const modal = document.getElementById('consent-modal');
         const consentBtn = document.getElementById('consent-btn');
@@ -61,21 +59,20 @@ class MiikunApp {
             });
         }
 
-        // Load VRM
         try {
             await this.vrmLoader.loadVRM('assets/miikun.vrm');
         } catch (e) {
-            console.warn("VRM file not found or placeholder detected. Ensure assets/miikun.vrm is a valid VRM file.");
-            // Optional: Provide a visual indicator in logs if needed.
+            console.warn("VRM file not found or placeholder detected.");
         }
 
-        // Subscribe to state changes
         state.subscribe((newState) => this.handleStateChange(newState));
 
-        // UI Listeners
         this.micButton.addEventListener('click', () => {
-            if (state.getState() === AppState.IDLE) {
+            const curState = state.getState();
+            if (curState === AppState.IDLE) {
                 this.startSession();
+            } else if (curState === AppState.LISTENING) {
+                this.audioIO.stopListening();
             }
         });
 
@@ -83,18 +80,78 @@ class MiikunApp {
             const subject = e.target.value;
             state.setSubject(subject);
             this.subjectBadge.innerText = `CLASS: ${subject.toUpperCase()}`;
-            this.history = []; // Reset history for new subject session
-            this.chatContainer.innerHTML = ''; // Clear chat for new session
+            this.history = [];
+            this.chatContainer.innerHTML = '';
             this.addMessage('miikun', `ボク、今は${e.target.options[e.target.selectedIndex].text}モードだよ。何でも聞いてね！`);
         });
 
-        // Add Welcome Message (Optional)
-        // this.addMessage('miikun', 'やっほー！今日は何して遊ぶ？それとも勉強する？');
+        // Help & TOS Logic
+        const helpModal = document.getElementById('help-modal');
+        const openHelp = document.getElementById('open-help');
+        const closeHelp = document.getElementById('close-help');
+        const openTos = document.getElementById('open-tos');
+        const helpTitle = document.getElementById('help-title');
+        const helpContent = document.getElementById('help-content');
+
+        const showHelp = (type) => {
+            helpModal.classList.remove('hidden');
+            if (type === 'tos') {
+                helpTitle.innerText = "利用規約";
+                helpContent.innerHTML = `
+                    <div class="space-y-6">
+                        <section>
+                            <h3 class="text-lg font-bold">1. データの収集と利用目的</h3>
+                            <p>本サービスは、教育支援AIの精度向上を目的に、ユーザーの対話データを収集し、AIの再学習に使用します。</p>
+                        </section>
+                        <section>
+                            <h3 class="text-lg font-bold">2. プライバシー保護</h3>
+                            <p>サーバーに送信される前に、個人名、住所、連絡先などの個人情報を検出し、自動的に除外または匿名化する処理を行います。</p>
+                        </section>
+                        <section>
+                            <h3 class="text-lg font-bold">3. 学習へのオプトアウト</h3>
+                            <p>データ収集を希望されない場合は、URLに <code>?optout=true</code> を追加してアクセスすることで、そのセッションの学習へのデータ利用を無効化できます。</p>
+                        </section>
+                        <section>
+                            <h3 class="text-lg font-bold">4. 免責事項</h3>
+                            <p>本AIの回答は常に正しいとは限りません。学習の補助ツールとしてご利用ください。</p>
+                        </section>
+                    </div>
+                `;
+            } else {
+                helpTitle.innerText = "使い方とクレジット";
+                helpContent.innerHTML = `
+                    <div class="space-y-6">
+                        <section>
+                            <h3 class="text-lg font-bold">📖 使い方</h3>
+                            <ul class="list-disc pl-5 space-y-2">
+                                <li><strong>話しかける:</strong> 画面下のマイクボタンを押して、ボク（みーくん）に話しかけてね。</li>
+                                <li><strong>聞き取り停止:</strong> 話し終わったら、もう一度マイクボタンを押すか、少し待つとボクが考え始めるよ。</li>
+                                <li><strong>科目を切り替える:</strong> 左上のメニューから、勉強したい科目を選んでね。</li>
+                                <li><strong>みーくんと触れ合う:</strong> ボクの頭をなでたり、体をつついたりしてみてね！</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h3 class="text-lg font-bold">✨ クレジット</h3>
+                            <p>音声合成: VOICEVOX: 白上虎太郎</p>
+                            <p>3Dモデル: Miikun Model (vrm)</p>
+                            <p>AI Engine: Miikun Core (FastAPI / Llama-2-7B)</p>
+                        </section>
+                        <section>
+                            <h3 class="text-lg font-bold">🛡️ 学習オプトアウトについて</h3>
+                            <p class="text-sm">プライバシーを重視する場合、URLの末尾に <code>?optout=true</code> を付けてアクセスすることで、対話データの学習利用を拒否できます。この設定は <code>index.html?optout=true</code> のように入力してください。</p>
+                        </section>
+                    </div>
+                `;
+            }
+        };
+
+        openHelp.addEventListener('click', (e) => { e.preventDefault(); showHelp('help'); });
+        openTos.addEventListener('click', () => showHelp('tos'));
+        closeHelp.addEventListener('click', () => helpModal.classList.add('hidden'));
+        helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.classList.add('hidden'); });
     }
 
     handleStateChange(newState) {
-        console.log("State Changed:", newState);
-
         switch (newState) {
             case AppState.IDLE:
                 this.micRing.classList.remove('mic-pulse');
@@ -111,8 +168,6 @@ class MiikunApp {
                 this.micRing.classList.add('mic-pulse', 'border-blue-400/80');
                 this.waveform.classList.remove('opacity-10');
                 this.waveform.classList.add('opacity-100');
-                const bars = this.waveform.querySelectorAll('div');
-                bars.forEach(bar => bar.classList.remove('animate-wave-1', 'animate-wave-2', 'animate-wave-3'));
                 this.statusText.classList.remove('opacity-0');
                 this.statusText.innerText = "Listening...";
                 this.vrmLoader.setLeaning(true);
@@ -135,50 +190,59 @@ class MiikunApp {
     }
 
     startSession() {
+        this.currentInterimMessage = null;
         this.audioIO.startListening(
-            (text) => this.processUserText(text),
+            (text, isInterimPart) => {
+                if (isInterimPart) {
+                    this.updateInterimMessage(text);
+                } else {
+                    this.processUserText(text);
+                }
+            },
+            (interimText) => this.updateInterimMessage(interimText),
             (error) => this.handleError(error)
         );
     }
 
+    updateInterimMessage(text) {
+        if (!this.currentInterimMessage) {
+            this.currentInterimMessage = document.createElement('div');
+            this.currentInterimMessage.className = 'message message-user opacity-50';
+            this.chatContainer.appendChild(this.currentInterimMessage);
+        }
+        this.currentInterimMessage.innerText = text;
+        this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: 'smooth' });
+    }
+
     async processUserText(text) {
-        this.addMessage('user', text);
+        if (this.currentInterimMessage) {
+            this.currentInterimMessage.classList.remove('opacity-50');
+            this.currentInterimMessage = null;
+        } else {
+            this.addMessage('user', text);
+        }
 
         try {
             state.setState(AppState.THINKING);
-
-            // Get reply and audio from API
             const result = await chatFull(state.sessionId, text, this.history, state.currentSubject);
 
             if (result.status === 'success') {
                 this.addMessage('miikun', result.reply_text);
+                if (result.emotion) this.vrmLoader.setEmotion(result.emotion);
 
-                // Emotion handling
-                if (result.emotion) {
-                    this.vrmLoader.setEmotion(result.emotion);
-                }
-
-                // Audio Playback with Fallback
                 if (result.audio) {
                     const audioUrl = `data:audio/wav;base64,${result.audio}`;
                     await this.audioIO.playTts(audioUrl, result.reply_text);
                 } else {
-                    // Fallback to browser TTS
                     await this.audioIO.playTts(null, result.reply_text);
                 }
 
-                // Update History
                 this.history.push({ role: 'user', content: text });
                 this.history.push({ role: 'assistant', content: result.reply_text });
-
-                // Keep history manageable
-                if (this.history.length > 20) {
-                    this.history.splice(0, 2);
-                }
+                if (this.history.length > 20) this.history.splice(0, 2);
             } else {
                 throw new Error("API reported failure");
             }
-
         } catch (e) {
             this.handleError(e);
         } finally {
@@ -191,28 +255,25 @@ class MiikunApp {
         div.className = `message message-${sender}`;
         div.innerText = (sender === 'miikun' ? 'Miikun: ' : '') + text;
         this.chatContainer.appendChild(div);
-
-        // Auto scroll
-        this.chatContainer.scrollTo({
-            top: this.chatContainer.scrollHeight,
-            behavior: 'smooth'
-        });
+        this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: 'smooth' });
     }
 
     handlePhysicalInteraction(type) {
         if (state.getState() !== AppState.IDLE) return;
-
         const reactions = type === 'head'
             ? ["わわっ！びっくりしたー！", "な、なでなで？照れるなあ...", "あはは、くすぐったいよ！"]
             : ["ん？どうしたの？", "ボクに何か用？", "えへへ、遊んでくれるの？"];
-
         const text = reactions[Math.floor(Math.random() * reactions.length)];
         this.addMessage('miikun', text);
-        this.audioIO.playTts(null, text); // Play via native TTS for instant reaction
+        this.audioIO.playTts(null, text);
     }
 
     handleError(error) {
         console.error("App Error:", error);
+        if (this.currentInterimMessage) {
+            this.currentInterimMessage.remove();
+            this.currentInterimMessage = null;
+        }
         const div = document.createElement('div');
         div.className = "message message-error";
         div.innerText = "聞き取れなかったみたい。もう一度言ってくれる？";
@@ -221,19 +282,14 @@ class MiikunApp {
     }
 }
 
-// Start App
 document.addEventListener('DOMContentLoaded', () => {
     new MiikunApp();
-
-    // Register Service Worker for PWA
     if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
-            const swPath = window.location.pathname.includes('github.io') ? '/Project-Miikun/sw.js' : './sw.js';
-            navigator.serviceWorker.register(swPath).then(reg => {
-                console.log('SW registered:', reg);
-            }).catch(err => {
-                console.log('SW registration failed:', err);
-            });
+            // Robust path detection for GitHub Pages vs Local
+            const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+            const swPath = basePath + 'sw.js';
+            navigator.serviceWorker.register(swPath).catch(err => console.log('SW registration failed:', err));
         });
     }
 });

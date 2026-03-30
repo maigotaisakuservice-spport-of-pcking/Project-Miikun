@@ -24,61 +24,53 @@ MAX_MINUTES = 25 # Training timeout safety guard
 
 def deliberate_and_filter(dataset, subject):
     """
-    Local Multi-Model Deliberation System.
-    Uses the base local LLM to verify scraped/logged data quality.
-    Only allows 'consensus' approved data into training.
+    Local Multi-Model Deliberation System (V2: 3-Persona Voting).
+    Uses three distinct personas to vote on data quality and PII removal.
+    A majority (2/3) is required for approval.
     """
-    print(f"--- Starting Local Deliberation for {subject} ---")
+    print(f"--- Starting 3-Model Deliberation for {subject} ---")
 
     if not os.path.exists(GGUF_PATH):
-        print(f"Warning: GGUF model not found at {GGUF_PATH}. Skipping deliberation (trusting all data).")
+        print(f"Warning: GGUF model not found at {GGUF_PATH}. Skipping deliberation.")
         return dataset
 
-    # Load a temporary verification engine (using local GGUF)
-    # Note: We use a strict prompt to act as an evaluator
     evaluator = Llama(model_path=GGUF_PATH, n_gpu_layers=-1, n_ctx=2048, verbose=False)
+
+    # Define Personas
+    personas = [
+        {"name": "Strict Teacher", "prompt": "あなたは非常に厳格な中学校の教師です。教育的に不適切な内容や、少しでも個人情報（名前、住所等）が含まれていれば即座に 'NG' と判定します。"},
+        {"name": "Objective Researcher", "prompt": "あなたは客観的なデータ研究者です。事実関係が正確か、個人情報の漏洩リスクがないかを冷静に分析し、合格なら 'OK'、不合格なら 'NG' と判定します。"},
+        {"name": "Friendly Senior Student", "prompt": "あなたは頼りになる中学3年生の先輩です。後輩に見せても恥ずかしくない内容か、誰かのプライバシーを傷つけていないかをチェックして 'OK' か 'NG' を出します。"}
+    ]
 
     verified_samples = []
     for item in dataset:
         content = item["text"]
+        votes = []
 
-        # Phase 1: Direct Quality Check & PII Filtering
-        prompt1 = f"""以下の学習用データの内容を審議してください。
-この内容は中学生向けの教育データとして「正確」かつ「適切」ですか？
+        for p in personas:
+            full_prompt = f"""{p['prompt']}
+以下の学習用データを審議し、'OK' または 'NG' で回答してください。
 
-【重要ルール: 個人情報の排除】
-- 歴史上の人物や有名な企業の社長以外の、一般人（生徒、先生など）の個人名らしきものが含まれている場合は、必ず 'NG' と判定してください。
-- 住所や電話番号などの個人情報が含まれている場合も 'NG' です。
-
-間違いや不適切な表現がある場合は 'NG'、問題ない場合は 'OK' とだけ答えてください。
+【審議基準】
+1. 中学生向けの学習内容として正確か。
+2. 歴史上の人物以外の一般人の名前（生徒名、教師名など）が含まれていないか。
+3. 住所、電話番号、SNSアカウントなどの個人情報が含まれていないか。
 
 【データ】
 {content}
 
-審議結果:"""
+判定（OK/NG）:"""
+            res = evaluator.create_chat_completion(messages=[{"role": "user", "content": full_prompt}], max_tokens=10, temperature=0.1)
+            vote = res["choices"][0]["message"]["content"].strip().upper()
+            votes.append("OK" in vote)
 
-        res1 = evaluator.create_chat_completion(messages=[{"role": "user", "content": prompt1}], max_tokens=10, temperature=0.1)
-        result1 = res1["choices"][0]["message"]["content"].strip().upper()
-
-        # Phase 2: Critical Review (Self-Correction & PII Re-check)
-        prompt2 = f"""以下のデータについて、あなたは「間違いがある」または「個人情報が含まれる」と指摘しました。本当にそう判定すべきですか？
-歴史上の人物以外の個人名などが含まれていないか、もう一度冷静に確認してください。
-もし教育上問題なく、かつ個人情報も含まれていない場合は 'OK'、やはりダメなら 'NG' と答えてください。
-【データ】: {content}
-【あなたの直前の判断】: {result1}
-再審議結果:"""
-
-        res2 = evaluator.create_chat_completion(messages=[{"role": "user", "content": prompt2}], max_tokens=10, temperature=0.1)
-        result2 = res2["choices"][0]["message"]["content"].strip().upper()
-
-        # Consensus logic: If both phases agree or the second phase confirms quality, we pass.
-        # This simulates a "multi-model" deliberation through multi-perspective prompting on the base model.
-        if "OK" in result1 and "OK" in result2:
+        # 2/3 Majority Consensus
+        if sum(votes) >= 2:
             verified_samples.append(item)
-        elif "OK" in result2: # If corrected during second thought
-             verified_samples.append(item)
         else:
-            print(f"  [REJECTED] {content[:50]}...")
+            rejected_reason = [personas[i]['name'] for i, v in enumerate(votes) if not v]
+            print(f"  [REJECTED by {', '.join(rejected_reason)}] {content[:50]}...")
 
     print(f"Deliberation complete. {len(verified_samples)}/{len(dataset)} samples verified.")
     return verified_samples

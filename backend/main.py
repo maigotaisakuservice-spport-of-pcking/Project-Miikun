@@ -1,11 +1,13 @@
 import os
 from fastapi import FastAPI, Header, HTTPException, Depends, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import subprocess
 import os
+import httpx
 from dotenv import load_dotenv
 
 from .db import init_db, insert_log, get_memories, update_memory
@@ -57,7 +59,14 @@ async def health():
 @app.post("/api/chat", dependencies=[Depends(verify_shared_secret)])
 async def chat(request: ChatRequest):
     memories = get_memories(request.session_id, request.subject)
-    result = engine.generate_reply(request.history, request.text, subject=request.subject, memories=memories)
+    # Offload blocking inference to threadpool
+    result = await run_in_threadpool(
+        engine.generate_reply,
+        request.history,
+        request.text,
+        subject=request.subject,
+        memories=memories
+    )
     reply_text = result["reply"]
     emotion = result["emotion"]
 
@@ -148,7 +157,14 @@ async def reload_lora(authorization: str = Header(...)):
 @app.post("/api/chat_full", dependencies=[Depends(verify_shared_secret)])
 async def chat_full(request: ChatRequest):
     memories = get_memories(request.session_id, request.subject)
-    result = engine.generate_reply(request.history, request.text, subject=request.subject, memories=memories)
+    # Offload blocking inference to threadpool
+    result = await run_in_threadpool(
+        engine.generate_reply,
+        request.history,
+        request.text,
+        subject=request.subject,
+        memories=memories
+    )
     reply_text = result["reply"]
     emotion = result["emotion"]
 

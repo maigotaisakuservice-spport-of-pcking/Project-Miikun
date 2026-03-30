@@ -46,9 +46,9 @@ def setup():
 
     print("\n--- Voice Settings ---")
     print("Common VOICEVOX Speaker IDs:")
-    print("  13: 栗田まろん (Recommended: Young Boy)")
-    print("  8: 春日部つむぎ (Girl)")
-    speaker_id = get_input("VOICEVOX Speaker ID", "13")
+    print("  32: 白上虎太郎 (わーい) - Recommended for Miikun")
+    print("  13: 青山龍星 (Normal)")
+    speaker_id = get_input("VOICEVOX Speaker ID", "32")
 
     # 2. Generate .env
     env_content = f"""SHARED_SECRET={shared_secret}
@@ -77,6 +77,8 @@ N_GPU_LAYERS=-1
     if not os.path.exists("venv"):
         run_cmd("python3 -m venv venv")
     run_cmd(f"{install_dir}/venv/bin/pip install -r backend/requirements.txt")
+    # Install training requirements for VPS-side weekly training
+    run_cmd(f"{install_dir}/venv/bin/pip install -r backend/requirements_train.txt")
 
     # 5. Configure Nginx
     print("\n--- Configuring Nginx ---")

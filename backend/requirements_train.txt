@@ -8,3 +8,5 @@ scipy
 accelerate
 sentencepiece
 llama-cpp-python
+beautifulsoup4
+requests
