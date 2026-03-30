@@ -7,7 +7,7 @@ on:
 
 jobs:
   train:
-    runs-on: ubuntu-latest # or self-hosted GPU runner
+    runs-on: self-hosted # GPU-enabled runner is required for LoRA training
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
 

@@ -6,7 +6,7 @@
 
 ### 1. 必須要件 (Requirements)
 - **OS**: Ubuntu 22.04 LTS (推奨)
-- **GPU**: NVIDIA GPU (VRAM 16GB以上推奨 / 推論: Llama-3-8B)
+- **GPU**: NVIDIA GPU (VRAM 16GB以上推奨 / 推論: Llama-2-7B)。**学習には GitHub Self-hosted GPU Runner が必要です。**
 - **Engine**: [VOICEVOX Engine](https://github.com/VOICEVOX/voicevox_engine)
 - **Runtime**: Python 3.10+, Node.js (ブラウザ閲覧用)
 
@@ -79,12 +79,12 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 | `VPS_HOST` | VPS の IP アドレス（またはドメイン）。契約したクラウドサービスの管理画面で確認できます。 |
 | `VPS_USER` | VPS ログイン用のユーザー名（例: `ubuntu`, `root`）。 |
 | `VPS_SSH_KEY` | ローカルの `~/.ssh/id_rsa` 等の中身。未作成なら `ssh-keygen` で作成し、公開鍵を VPS の `~/.ssh/authorized_keys` に登録してください。 |
-| `VPS_URL` | あなたが取得したドメイン名（例: `https://miikun.com`）。マイク利用のため **HTTPS** が必須です。 |　まだ
+| `VPS_URL` | あなたが取得したドメイン名（例: `https://miikun.com`）。マイク利用のため **HTTPS** が必須です。 |
 | `HF_TOKEN` | [Hugging Face サイト](https://huggingface.co/settings/tokens)で作成できます。 |
-| `HF_BASE_MODEL` | 使用したいモデルのパス（例: `elyza/ELYZA-japanese-Llama-3-8B-Instruct`）。 |
-| `WEBHOOK_SECRET` | `setup_vps.py` 実行時に生成（または入力）した、デプロイ用の任意の長い文字列です。 |　まだ
-| `GITHUB_REPO` | 自身のリポジトリ名（例: `username/miikun-core`）。 |　まだ
-| `GITHUB_TOKEN` | [GitHub Settings > Developer settings](https://github.com/settings/tokens) で作成する **Personal Access Token (classic)** です。`repo` と `workflow` の権限が必要です。 |　まだ
+| `HF_BASE_MODEL` | 使用したいモデルのパス（例: `elyza/ELYZA-japanese-Llama-2-7b-instruct`）。 |
+| `WEBHOOK_SECRET` | `setup_vps.py` 実行時に生成（または入力）した、デプロイ用の任意の長い文字列です。 |
+| `GH_REPO` | 自身のリポジトリ名（例: `username/miikun-core`）。 |
+| `GH_PAT` | [GitHub Settings > Developer settings](https://github.com/settings/tokens) で作成する **Personal Access Token (classic)** です。`repo` と `workflow` の権限が必要です。 |
 
 ## 🔐 🔐 セキュリティ設定
 - **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。
@@ -96,16 +96,17 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 
 ### 初回トレーニング (Initial Setup)
 システムを最初に起動した直後は LoRA 重みがありません。以下の手順で最初のアダプタを生成してください：
-1. GitHub のリポジトリページから **Actions** タブを開きます。
-2. 左メニューの **"Initial Miikun Training"** を選択します。
-3. **"Run workflow"** ボタンをクリックして実行してください。
+1. **Runner の準備**: 学習には大量の計算リソース（GPU）が必要です。GitHub の [Self-hosted runner](https://docs.github.com/ja/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners) を作成し、GPU が利用可能なマシンを登録してください。
+2. Actions を開く: GitHub のリポジトリページから **Actions** タブを開きます。
+3. 手動実行: 左メニューの **"Initial Miikun Training"** を選択し、**"Run workflow"** をクリックします。
 
 ### 継続的学習サイクル
 1. **対話ログの蓄積**: 日々の会話は `backend/data/logs.db` に保存されます。
 2. **週次データ抽出**: 毎週日曜 AM3:00（JST）、GitHub Actions が起動し、VPS 上の `backend/scripts/export_logs.py` を呼び出します。
    - **セーフティガード**: 新規ログが **50件以上** ある場合のみ、学習用の `train_data.jsonl` を生成します。
  3. **多モデル審議 (Deliberation)**: 生成されたデータは、学習前にローカル LLM による厳格な審議にかけられます。
-    - 「中学生向けの教育データとして正確か？」をチェックし、合格したデータのみを抽出します。
+    - **審議ロジック**: ベースモデル（ELYZA-Llama-2）を活用した「自己批評・合意形成システム」を採用。
+    - 「中学生向けの教育データとして正確か？」をチェックし、合格したデータのみを抽出します。これにより、ノイズや誤った知識の学習を防ぎ、キャラクターの品質を維持します。
  4. **クラウド学習 (LoRA)**: 検証済みのデータを用いて、教科ごとに独立した LoRA アダプタを作成します。
     - ベースモデルの知識を保ちつつ、各教科の専門性を高めます。
 4. **自動デプロイと反映**:
@@ -120,7 +121,7 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 ## 🎨 🎨 ライセンスと帰属 (License & Attribution)
 - **System Code**: MIT License
 - **TTS Engine**: VOICEVOX (音声モデル: 栗田まろん)。利用規約に従って使用してください。
-- **Base LLM**: Meta Llama-3 License に準拠します。
+- **Base LLM**: Meta Llama-2 License に準拠します。
 
 ---
 **Miikun Intelligence Project**

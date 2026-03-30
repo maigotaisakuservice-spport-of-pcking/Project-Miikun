@@ -41,8 +41,8 @@ def setup():
     webhook_secret = get_input("Webhook Secret for Deployment", secrets.token_hex(16))
 
     print("\n--- GitHub Integration ---")
-    github_repo = get_input("GitHub Repo (user/repo)", "user/repo")
-    github_token = get_input("GitHub Personal Access Token", "ghp_xxxx")
+    gh_repo = get_input("GitHub Repo (user/repo)", "user/repo")
+    gh_pat = get_input("GitHub Personal Access Token", "ghp_xxxx")
 
     print("\n--- Voice Settings ---")
     print("Common VOICEVOX Speaker IDs:")
@@ -55,8 +55,8 @@ def setup():
 ALLOWED_ORIGINS=https://{domain},http://localhost:8080,http://{domain}
 WEBHOOK_SECRET={webhook_secret}
 MASTER_SECRET={master_secret}
-GITHUB_REPO={github_repo}
-GITHUB_TOKEN={github_token}
+GH_REPO={gh_repo}
+GH_PAT={gh_pat}
 VOICEVOX_URL=http://localhost:50021
 SPEAKER_ID={speaker_id}
 MODEL_PATH=models/base_model.gguf
@@ -125,6 +125,10 @@ N_GPU_LAYERS=-1
     print(f"4. START VOICEVOX: sudo docker-compose -f backend/infra/docker-compose.yml up -d")
     if domain != "localhost":
         print(f"5. SETUP SSL: sudo certbot --nginx -d {domain}")
+
+    print("\n--- CRITICAL: GitHub Secrets ---")
+    print("Copy the following WEBHOOK_SECRET to your GitHub Repo Secrets as WEBHOOK_SECRET:")
+    print(f"WEBHOOK_SECRET: {webhook_secret}")
 
     print("\nWelcome to the future of learning with Miikun!")
 

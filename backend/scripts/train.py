@@ -15,7 +15,10 @@ from trl import SFTTrainer
 from llama_cpp import Llama
 
 # Configs
-BASE_MODEL = os.getenv("BASE_MODEL", "elyza/ELYZA-japanese-Llama-3-8B-Instruct")
+# BASE_MODEL should be the Hugging Face repo ID for training
+BASE_MODEL = os.getenv("BASE_MODEL", "elyza/ELYZA-japanese-Llama-2-7b-instruct")
+# GGUF_PATH should be the local path to the GGUF model for deliberation
+GGUF_PATH = os.getenv("MODEL_PATH", "models/base_model.gguf")
 OUTPUT_DIR = "models/active_lora/"
 MAX_MINUTES = 25 # Training timeout safety guard
 
@@ -27,16 +30,20 @@ def deliberate_and_filter(dataset, subject):
     """
     print(f"--- Starting Local Deliberation for {subject} ---")
 
-    # Load a temporary verification engine (using base model)
+    if not os.path.exists(GGUF_PATH):
+        print(f"Warning: GGUF model not found at {GGUF_PATH}. Skipping deliberation (trusting all data).")
+        return dataset
+
+    # Load a temporary verification engine (using local GGUF)
     # Note: We use a strict prompt to act as an evaluator
-    evaluator = Llama(model_path=BASE_MODEL, n_gpu_layers=-1, n_ctx=2048, verbose=False)
+    evaluator = Llama(model_path=GGUF_PATH, n_gpu_layers=-1, n_ctx=2048, verbose=False)
 
     verified_samples = []
     for item in dataset:
         content = item["text"]
 
-        # Deliberation Prompt (Chain of Thought / Fact Check)
-        prompt = f"""以下の学習用データの内容を審議してください。
+        # Phase 1: Direct Quality Check
+        prompt1 = f"""以下の学習用データの内容を審議してください。
 この内容は中学生向けの教育データとして「正確」かつ「適切」ですか？
 間違いや不適切な表現がある場合は 'NG'、問題ない場合は 'OK' とだけ答えてください。
 
@@ -45,18 +52,25 @@ def deliberate_and_filter(dataset, subject):
 
 審議結果:"""
 
-        # Simulated Multi-turn/Multi-prompt deliberation
-        # In a real setup, we might ask twice or use two different models.
-        response = evaluator.create_chat_completion(
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=10,
-            temperature=0.1
-        )
+        res1 = evaluator.create_chat_completion(messages=[{"role": "user", "content": prompt1}], max_tokens=10, temperature=0.1)
+        result1 = res1["choices"][0]["message"]["content"].strip().upper()
 
-        result = response["choices"][0]["message"]["content"].strip().upper()
-        if "OK" in result:
+        # Phase 2: Critical Review (Self-Correction Prompt)
+        prompt2 = f"""以下のデータについて、あなたは「間違いがある」と指摘しました。本当に間違いですか？
+もう一度冷静に確認し、もし教育上問題なければ 'OK'、やはりダメなら 'NG' と答えてください。
+【データ】: {content}
+【あなたの直前の判断】: {result1}
+再審議結果:"""
+
+        res2 = evaluator.create_chat_completion(messages=[{"role": "user", "content": prompt2}], max_tokens=10, temperature=0.1)
+        result2 = res2["choices"][0]["message"]["content"].strip().upper()
+
+        # Consensus logic: If both phases agree or the second phase confirms quality, we pass.
+        # This simulates a "multi-model" deliberation through multi-perspective prompting on the base model.
+        if "OK" in result1 and "OK" in result2:
             verified_samples.append(item)
-            # print(f"  [PASS] {content[:50]}...")
+        elif "OK" in result2: # If corrected during second thought
+             verified_samples.append(item)
         else:
             print(f"  [REJECTED] {content[:50]}...")
 

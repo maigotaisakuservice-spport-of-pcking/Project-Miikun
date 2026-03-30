@@ -41,38 +41,48 @@ class LLMEngine:
         Load or switch to a subject-specific LoRA adapter.
         AI自体は一つだが、教科ごとに学習内容（LoRA）を使い分ける。
         """
+        # If model is not loaded at all, initialize base model first
+        if self.llm is None:
+            print(f"Initializing base model: {MODEL_PATH}")
+            self.llm = Llama(
+                model_path=MODEL_PATH,
+                n_gpu_layers=N_GPU_LAYERS,
+                n_ctx=4096,
+                chat_format="llama-2"
+            )
+
         # Path for subject-specific LoRA
-        # models/active_lora/math/, models/active_lora/japanese/, etc.
         specific_lora_path = os.path.join(LORA_PATH, subject)
         lora_file = os.path.join(specific_lora_path, "adapter_model.safetensors")
 
-        # If already loaded the correct adapter, skip (unless reload forced)
-        if self.llm and self.current_adapter == subject:
+        # If already loaded the correct adapter, skip
+        if self.current_adapter == subject:
             return
 
         print(f"Switching to subject: {subject}...")
 
-        # In this implementation, we re-init the Llama object for the subject.
-        # Note: llama-cpp-python's internal caching usually makes this fast if base model is in RAM.
-        if os.path.exists(lora_file):
-            print(f"Loading {subject} adapter from {specific_lora_path}")
-            self.llm = Llama(
-                model_path=MODEL_PATH,
-                lora_path=specific_lora_path,
-                n_gpu_layers=N_GPU_LAYERS,
-                n_ctx=4096,
-                chat_format="llama-3"
-            )
-        else:
-            print(f"No specific adapter for {subject}. Using base model.")
-            # Fallback to general LoRA if exists
-            general_lora = os.path.join(LORA_PATH, "general", "adapter_model.safetensors")
-            if os.path.exists(general_lora):
-                 self.llm = Llama(model_path=MODEL_PATH, lora_path=os.path.join(LORA_PATH, "general"), n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-3")
+        # llama-cpp-python provides set_lora/apply_lora in some versions,
+        # but the most stable way for multi-lora is often swapping the adapter.
+        # Here we re-apply the adapter to the existing LLM instance.
+        try:
+            if os.path.exists(lora_file):
+                print(f"Applying LoRA adapter from {specific_lora_path}")
+                self.llm.set_lora_path(specific_lora_path)
             else:
-                 self.llm = Llama(model_path=MODEL_PATH, n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-3")
+                print(f"No specific adapter for {subject}. Using base model (removing LoRA).")
+                # Fallback to general or remove
+                general_lora_path = os.path.join(LORA_PATH, "general")
+                if os.path.exists(os.path.join(general_lora_path, "adapter_model.safetensors")):
+                    self.llm.set_lora_path(general_lora_path)
+                else:
+                    self.llm.set_lora_path(None)
 
-        self.current_adapter = subject
+            self.current_adapter = subject
+        except Exception as e:
+            print(f"Error switching LoRA: {e}. Re-initializing model as fallback.")
+            # Fallback to full re-init if set_lora_path is not supported or fails
+            self.llm = Llama(model_path=MODEL_PATH, lora_path=specific_lora_path if os.path.exists(lora_file) else None, n_gpu_layers=N_GPU_LAYERS, n_ctx=4096, chat_format="llama-2")
+            self.current_adapter = subject
 
     def reload_lora(self):
         """Called by Webhook after new weights are pushed."""

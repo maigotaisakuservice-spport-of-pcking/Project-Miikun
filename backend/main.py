@@ -99,10 +99,10 @@ async def trigger_manual_train(authorization: str = Header(...)):
         )
 
         # 2. Trigger GHA (Optional if secrets are set)
-        repo = os.getenv("GITHUB_REPO") # e.g. "user/repo"
-        token = os.getenv("GITHUB_TOKEN")
+        repo = os.getenv("GH_REPO") # e.g. "user/repo"
+        token = os.getenv("GH_PAT")
 
-        gha_status = "skipped (no GITHUB_TOKEN)"
+        gha_status = "skipped (no GH_PAT)"
         if repo and token:
             async with httpx.AsyncClient() as client:
                 response = await client.post(

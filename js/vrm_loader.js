@@ -44,12 +44,18 @@ export class VRMLoader {
         // Position camera to focus on VRM (a bit to the left of center as per spec)
         this.camera.position.set(-0.3, 1.4, 3.5);
 
-        // Light
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        this.scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        directionalLight.position.set(1, 1, 1);
-        this.scene.add(directionalLight);
+        // Improved Lighting for Vroid/VRM
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+        hemisphereLight.position.set(0, 2, 0);
+        this.scene.add(hemisphereLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        mainLight.position.set(1, 1, 1);
+        this.scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        fillLight.position.set(-1, 1, 1);
+        this.scene.add(fillLight);
 
         // Window resize
         window.addEventListener('resize', () => {
@@ -124,6 +130,10 @@ export class VRMLoader {
 
                     this.scene.add(vrm.scene);
                     this.vrm = vrm;
+
+                    // Configure LookAt
+                    vrm.lookAt.target = this.camera;
+
                     console.log("VRM loaded successfully");
                     resolve(vrm);
                 },
