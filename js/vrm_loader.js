@@ -29,14 +29,12 @@ export class VRMLoader {
         this.renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
             alpha: true,
-            antialias: true
+            antialias: true,
+            powerPreference: "high-performance"
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-        // Ensure ColorManagement is consistent
-        this.renderer.useLegacyLights = false;
 
         // Scene
         this.scene = new THREE.Scene();
@@ -131,10 +129,13 @@ export class VRMLoader {
                 },
                 (progress) => {
                     if (progress.total > 0) {
-                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        const percent = Math.min(100, Math.round((progress.loaded / progress.total) * 100));
                         console.log(`Loading VRM... ${percent}%`);
                     } else {
-                        console.log(`Loading VRM... ${Math.round(progress.loaded / 1024)} KB`);
+                        // Avoid showing excessive progress logs if total is unknown
+                        if (Math.round(progress.loaded / 1024) % 100 === 0) {
+                            console.log(`Loading VRM... ${Math.round(progress.loaded / 1024)} KB`);
+                        }
                     }
                 },
                 (error) => {

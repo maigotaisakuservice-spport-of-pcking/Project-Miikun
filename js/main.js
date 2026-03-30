@@ -213,9 +213,10 @@ document.addEventListener('DOMContentLoaded', () => {
     new MiikunApp();
 
     // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').then(reg => {
+            const swPath = window.location.pathname.includes('github.io') ? '/Project-Miikun/sw.js' : './sw.js';
+            navigator.serviceWorker.register(swPath).then(reg => {
                 console.log('SW registered:', reg);
             }).catch(err => {
                 console.log('SW registration failed:', err);

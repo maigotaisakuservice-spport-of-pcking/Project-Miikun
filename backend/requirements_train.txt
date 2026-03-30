@@ -7,3 +7,4 @@ bitsandbytes
 scipy
 accelerate
 sentencepiece
+llama-cpp-python
