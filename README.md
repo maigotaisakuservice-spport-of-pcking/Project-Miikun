@@ -79,12 +79,12 @@ GitHub Actions を正常に動作させるため、リポジトリの **Settings
 | `VPS_HOST` | VPS の IP アドレス（またはドメイン）。契約したクラウドサービスの管理画面で確認できます。 |
 | `VPS_USER` | VPS ログイン用のユーザー名（例: `ubuntu`, `root`）。 |
 | `VPS_SSH_KEY` | ローカルの `~/.ssh/id_rsa` 等の中身。未作成なら `ssh-keygen` で作成し、公開鍵を VPS の `~/.ssh/authorized_keys` に登録してください。 |
-| `VPS_URL` | あなたが取得したドメイン名（例: `https://miikun.com`）。マイク利用のため **HTTPS** が必須です。 |
+| `VPS_URL` | あなたが取得したドメイン名（例: `https://miikun.com`）。マイク利用のため **HTTPS** が必須です。 |　まだ
 | `HF_TOKEN` | [Hugging Face サイト](https://huggingface.co/settings/tokens)で作成できます。 |
 | `HF_BASE_MODEL` | 使用したいモデルのパス（例: `elyza/ELYZA-japanese-Llama-3-8B-Instruct`）。 |
-| `WEBHOOK_SECRET` | `setup_vps.py` 実行時に生成（または入力）した、デプロイ用の任意の長い文字列です。 |
-| `GITHUB_REPO` | 自身のリポジトリ名（例: `username/miikun-core`）。 |
-| `GITHUB_TOKEN` | [GitHub Settings > Developer settings](https://github.com/settings/tokens) で作成する **Personal Access Token (classic)** です。`repo` と `workflow` の権限が必要です。 |
+| `WEBHOOK_SECRET` | `setup_vps.py` 実行時に生成（または入力）した、デプロイ用の任意の長い文字列です。 |　まだ
+| `GITHUB_REPO` | 自身のリポジトリ名（例: `username/miikun-core`）。 |　まだ
+| `GITHUB_TOKEN` | [GitHub Settings > Developer settings](https://github.com/settings/tokens) で作成する **Personal Access Token (classic)** です。`repo` と `workflow` の権限が必要です。 |　まだ
 
 ## 🔐 🔐 セキュリティ設定
 - **ドメイン制限 (CORS)**: `ALLOWED_ORIGINS` に設定されたドメイン以外からのブラウザアクセスを遮断します。
