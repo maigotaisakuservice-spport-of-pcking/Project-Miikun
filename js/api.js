@@ -4,8 +4,9 @@ const SHARED_SECRET = "miikun_shared_pass";
 
 // If using GitHub Pages or a separate frontend, set your VPS URL here:
 // Example: const BASE_URL = "https://your-domain.com/api";
-const BASE_URL = window.location.hostname.includes('github.io') 
-    ? "https://miikun-ai-server.pdg.f5.si/api" // Ensure absolute URL with protocol
+const BACKEND_DOMAIN = "https://miikun-ai-server.pdg.f5.si"; // 🔥 CHANGE TO YOUR VPS DOMAIN
+const BASE_URL = (window.location.hostname.includes('github.io') || window.location.hostname.includes('github.com'))
+    ? `${BACKEND_DOMAIN}/api`
     : "/api";
 
 export async function chat(sessionId, text, history, subject = "general") {
