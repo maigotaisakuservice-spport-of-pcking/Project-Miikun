@@ -57,7 +57,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        subject: ${{ fromJson(needs:prepare-data.outputs.subjects) }}
+        subject: ${{ fromJson(needs['prepare-data'].outputs.subjects) }}
       fail-fast: false
     steps:
       - name: Checkout Code
