@@ -2,15 +2,12 @@
 // Primary security is provided by Domain/Origin restriction on the backend.
 const SHARED_SECRET = "miikun_shared_pass";
 
-// If using GitHub Pages or a separate frontend, set your VPS URL here:
-// Example: const BASE_URL = "https://your-domain.com/api";
-const BACKEND_DOMAIN = "https://miikun-ai-server.pdg.f5.si"; // 🔥 CHANGE TO YOUR VPS DOMAIN
-const BASE_URL = (window.location.hostname.includes('github.io') || window.location.hostname.includes('github.com'))
-    ? `${BACKEND_DOMAIN}/api`
-    : "/api";
+// ⚠️ Set your VPS API URL here. 
+// If using GitHub Pages, this MUST be an absolute URL starting with https://
+const BASE_URL = "https://miikun-ai-server.pdg.f5.si/api";
 
 export async function chat(sessionId, text, history, subject = "general") {
-    const endpoint = BASE_URL.endsWith('/') ? `${BASE_URL}chat` : `${BASE_URL}/chat`;
+    const endpoint = BASE_URL.replace(/\/$/, '') + '/chat';
     const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -33,7 +30,7 @@ export async function chat(sessionId, text, history, subject = "general") {
 }
 
 export async function getTtsAudio(text) {
-    const endpoint = BASE_URL.endsWith('/') ? `${BASE_URL}tts` : `${BASE_URL}/tts`;
+    const endpoint = BASE_URL.replace(/\/$/, '') + '/tts';
     const response = await fetch(`${endpoint}?text=${encodeURIComponent(text)}`, {
         method: "GET",
         headers: {
@@ -51,8 +48,7 @@ export async function getTtsAudio(text) {
 
 // Full endpoint (text + audio) for better performance
 export async function chatFull(sessionId, text, history, subject = "general") {
-    // If BASE_URL is absolute, we need to ensure trailing slash logic is handled
-    const endpoint = BASE_URL.endsWith('/') ? `${BASE_URL}chat_full` : `${BASE_URL}/chat_full`;
+    const endpoint = BASE_URL.replace(/\/$/, '') + '/chat_full';
     const response = await fetch(endpoint, {
         method: "POST",
         headers: {
