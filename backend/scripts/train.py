@@ -20,7 +20,7 @@ BASE_MODEL = os.getenv("BASE_MODEL", "elyza/ELYZA-japanese-Llama-2-7b-instruct")
 # GGUF_PATH should be the local path to the GGUF model for deliberation
 GGUF_PATH = os.getenv("MODEL_PATH", "models/base_model.gguf")
 OUTPUT_DIR = "models/active_lora/"
-MAX_MINUTES = 25 # Training timeout safety guard
+MAX_MINUTES = 180 # Extended training timeout for larger datasets (3 hours)
 
 def deliberate_and_filter(dataset, subject):
     """
@@ -134,7 +134,7 @@ def train_subject(subject, data_file):
         per_device_train_batch_size=4,
         gradient_accumulation_steps=4,
         learning_rate=2e-5,
-        max_steps=50, # Optimized for speed
+        max_steps=200, # Increased steps for deeper learning
         save_strategy="no",
         fp16=True,
         optim="paged_adamw_32bit",
