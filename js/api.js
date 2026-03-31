@@ -1,7 +1,7 @@
 // ⚠️ SHARED_SECRET: This is a basic handshake key.
 // Primary security is provided by Domain/Origin restriction on the backend.
 const SHARED_SECRET = "miikun_shared_pass";
-const BASE_URL = "/api";
+const BASE_URL = "miikun-ai-server.pdg.f5.si/api";
 
 export async function chat(sessionId, text, history, subject = "general") {
     const response = await fetch(`${BASE_URL}/chat`, {
