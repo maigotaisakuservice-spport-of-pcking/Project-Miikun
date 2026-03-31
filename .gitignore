@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+ENV/
+env/
+backend/data/*.db
+train_data.jsonl
+node_modules/
+.DS_Store
+backend_output.log
+verification/

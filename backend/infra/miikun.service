@@ -1,0 +1,13 @@
+[Unit]
+Description=Miikun FastAPI Backend
+After=network.target
+
+[Service]
+User={{USER}}
+WorkingDirectory={{INSTALL_DIR}}
+EnvironmentFile={{INSTALL_DIR}}/backend/.env
+ExecStart={{INSTALL_DIR}}/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
