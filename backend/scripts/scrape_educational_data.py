@@ -4,21 +4,55 @@ import requests
 from bs4 import BeautifulSoup
 import time
 
-# MEXT Middle School Curriculum Guidelines (Comprehensive Targets)
+# MEXT Middle School Curriculum Guidelines (Detailed Targets)
 # 文部科学省 中学校学習指導要領 (平成29年告示) に基づく詳細な学習範囲
 SUBJECTS_KEYWORDS = {
-    "japanese": ["中学校 国語 話すこと・聞くこと", "書くこと", "読むこと", "情報の扱い方", "我が国の言語文化 (古文・漢文・書写)"],
-    "social": ["中学校 地理分野 (世界の様々な地域, 日本の様々な地域)", "歴史分野 (近代の日本と世界, 現代の日本と世界)", "公民分野 (現代社会と私たちの生活, 私たちの生活と経済, 私たちの生活と政治)"],
-    "math": ["中学校 数学 数と式 (正負の数, 文字の式, 一次方程式)", "図形 (平面図形, 空間図形)", "関数 (比例, 反比例)", "データの活用 (ヒストグラム, 代表値)"],
-    "science": ["中学校 理科 第1分野 (物質の成り立ち, 化学変化, 電気, 運動とエネルギー)", "第2分野 (生物の観察, 植物・動物の生活, 大地の変化, 気象の観察, 天体)"],
-    "music": ["中学校 音楽 歌唱", "器楽", "創作", "鑑賞 (我が国の伝統音楽を含む)"],
-    "art": ["中学校 美術 表現 (描画, 立体, デザイン, 工芸)", "鑑賞 (美術文化の継承と創造)"],
-    "pe": ["中学校 保健体育 体育分野 (陸上競技, 水泳, 球技, 武道, ダンス)", "保健分野 (心身の機能の発達, 健康と生活, 傷害の防止, 精神の健康)"],
-    "tech": ["中学校 技術・家庭(技術分野) 材料と加工の技術", "生物育成の技術", "エネルギー変換の技術", "情報の技術"],
-    "home": ["中学校 技術・家庭(家庭分野) 食生活と自立", "衣生活・住生活と自立", "家族・家庭と子供の成長", "消費生活・環境と自立"],
-    "gs": ["中学校 英語 聞くこと", "読むこと", "話すこと［やり取り・発表］", "書くこと", "言語材料 (助動詞, 不定詞, 現在完了形, 受動態, 関係代名詞)"],
-    "moral": ["中学校 道徳 自己を見つめる", "人との関わり", "集団や社会との関わり", "生命や自然、崇高なものとの関わり"],
-    "integrated": ["中学校 総合的な学習の時間 探究的な学習", "地域社会や世界の課題", "自己の生き方と進路"]
+    "japanese": [
+        "国語", "漢字", "書写", "古文", "漢文", "奥の細道", "枕草子", "竹取物語", "徒然草", "走れメロス", "故郷 (小説)", "高瀬舟", 
+        "敬語", "現代文", "文学", "読書", "対話", "議論", "プレゼンテーション"
+    ],
+    "social": [
+        "地理学", "世界地図", "アジア", "ヨーロッパ", "北アメリカ", "南アメリカ", "オセアニア", "アフリカ", "日本の地理", "九州地方", "中国地方", "四国地方", "近畿地方", "中部地方", "関東地方", "東北地方", "北海道地方", 
+        "日本史", "縄文時代", "弥生時代", "古墳時代", "飛鳥時代", "奈良時代", "平安時代", "鎌倉時代", "室町時代", "安土桃山時代", "江戸時代", "明治維新", "大正デモクラシー", "第二次世界大戦", "戦後日本", 
+        "政治", "日本国憲法", "三権分立", "国会", "内閣", "裁判所", "選挙", "経済", "需要と供給", "市場経済", "社会保障", "国際連合", "グローバル化"
+    ],
+    "math": [
+        "算術", "正の数と負の数", "文字式", "一次方程式", "連立方程式", "二次方程式", "因数分解", "平方根", 
+        "比例", "反比例", "一次関数", "二次関数", 
+        "平面図形", "空間図形", "合同", "相似", "円周角の定理", "三平方の定理", 
+        "確率", "統計学", "ヒストグラム", "平均値", "中央値", "最頻値", "箱ひげ図"
+    ],
+    "science": [
+        "生物学", "細胞", "光合成", "呼吸", "消化", "血液循環", "神経系", "遺伝", "進化", 
+        "化学", "原子", "分子", "化学反応式", "イオン", "酸と塩基", "酸化と還元", 
+        "物理学", "光", "音", "力", "圧力", "電気", "電流", "電圧", "磁界", "エネルギー", "仕事", 
+        "地学", "火山", "地震", "地層", "化石", "気象", "天気図", "天文学", "太陽系", "月", "金星", "銀河"
+    ],
+    "music": [
+        "音楽学", "楽譜", "合唱", "器楽", "リコーダー", "ギター", "お琴", "和楽器", "クラシック音楽", "モーツァルト", "ベートーヴェン", "日本の伝統音楽", "雅楽"
+    ],
+    "art": [
+        "美術", "デッサン", "水彩画", "版画", "彫刻", "デザイン", "色彩", "パース", "陶芸", "工芸", "日本の美術史", "西洋美術史"
+    ],
+    "pe": [
+        "体育", "陸上競技", "短距離走", "長距離走", "走り幅跳び", "水泳", "器械運動", "跳び箱", "マット運動", "球技", "サッカー", "バスケットボール", "バレーボール", "テニス", "ベースボール", "卓球", "武道", "柔道", "剣道", "弓道", "ダンス", 
+        "保健", "思春期", "ストレス", "生活習慣病", "応急手当", "環境衛生", "薬物乱用防止"
+    ],
+    "tech": [
+        "技術学", "材料工学", "木材加工", "金属加工", "プラスチック加工", "電気回路", "モーター", "発電", "プログラミング", "情報ネットワーク", "サイバーセキュリティ", "ロボット工学"
+    ],
+    "home": [
+        "家庭科", "食育", "栄養素", "調理", "裁縫", "衣服の管理", "住居", "家族", "保育", "高齢者福祉", "消費者の権利"
+    ],
+    "gs": [
+        "英語", "英文法", "代名詞", "現在進行形", "過去形", "未来形", "助動詞", "不定詞", "動名詞", "比較級", "受動態", "現在完了形", "関係代名詞", "英会話", "英単語", "リスニング"
+    ],
+    "moral": [
+        "道徳", "礼儀", "友情", "公正", "生命尊重", "自然愛護", "郷土愛", "国際理解"
+    ],
+    "integrated": [
+        "総合的な学習の時間", "SDGs", "キャリア教育", "防災", "福祉", "ボランティア", "プレゼンテーション技法"
+    ]
 }
 
 def scrape_educational_content():
@@ -42,25 +76,32 @@ def scrape_educational_content():
 
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'html.parser')
-                    # Get first few paragraphs
-                    paragraphs = soup.find_all('p')[:3]
+                    # Get more content (up to 8 paragraphs)
+                    paragraphs = soup.find_all('p')[:8]
                     text_content = "\n".join([p.get_text().strip() for p in paragraphs if len(p.get_text()) > 20])
 
                     if text_content:
-                        # Format as a QA pair
-                        entry = {
-                            "text": f"### Subject: {subject}\n### User: {kw}について教えて！\n### Assistant: {text_content[:800]}（出典: Wikipedia）"
-                        }
-                        scraped_data.append(entry)
+                        # 2. Data Augmentation: Create multiple variations per knowledge piece
+                        
+                        # Style A: Direct explanation
+                        scraped_data.append({
+                            "text": f"### Subject: {subject}\n### User: {kw}について詳しく教えて！\n### Assistant: {text_content[:1000]}（出典: Wikipedia）"
+                        })
+                        
+                        # Style B: Friendly classroom talk
+                        scraped_data.append({
+                            "text": f"### Subject: {subject}\n### User: {kw}がよくわからないんだけど、教えてくれる？\n### Assistant: もちろんだよ！{kw}はね、中学校の勉強だとこういうところがポイントなんだ。{text_content[:400]}...って感じかな。一緒に覚えよう！"
+                        })
 
-                # 2. Add some synthetic conversational variations to the real data
-                # to help the AI learn the "Miikun" persona with real knowledge
-                if len(scraped_data) > 0 and scraped_data[-1]["text"].startswith(f"### Subject: {subject}"):
-                    base_knowledge = scraped_data[-1]["text"].split("### Assistant: ")[1]
-                    variation = {
-                        "text": f"### Subject: {subject}\n### User: {kw}って中学校の勉強だとどんな感じ？\n### Assistant: {kw}だね！文科省の指針だと、こういうことが大事だよ。{base_knowledge[:200]}...って感じかな。一緒に頑張ろう！"
-                    }
-                    scraped_data.append(variation)
+                        # Style C: Quiz style
+                        scraped_data.append({
+                            "text": f"### Subject: {subject}\n### User: {kw}に関するクイズを出して！\n### Assistant: いいよ！じゃあ問題。{kw}について、{text_content[:150]}...という特徴があるけど、これって何のことか覚えてるかな？答えは{kw}だよ！"
+                        })
+
+                        # Style D: Short summary
+                        scraped_data.append({
+                            "text": f"### Subject: {subject}\n### User: {kw}を短くまとめると？\n### Assistant: 簡単に言うとね、{text_content[:200]}...っていうことだよ！テストに出やすいからチェックしておこう。"
+                        })
 
             except Exception as e:
                 print(f"  Error scraping {kw}: {e}")
