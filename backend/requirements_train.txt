@@ -1,0 +1,12 @@
+torch
+transformers
+peft
+trl
+datasets
+bitsandbytes
+scipy
+accelerate
+sentencepiece
+llama-cpp-python
+beautifulsoup4
+requests

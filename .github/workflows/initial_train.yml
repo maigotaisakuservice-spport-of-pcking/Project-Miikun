@@ -1,0 +1,108 @@
+name: Initial Miikun Training
+
+on:
+  workflow_dispatch: # Manual trigger only for the first setup
+  repository_dispatch:
+    types: [manual_train]
+
+jobs:
+  prepare-data:
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+    outputs:
+      subjects: ${{ steps.set-subjects.outputs.subjects }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r backend/requirements_train.txt
+      - name: Scrape Educational Data
+        run: python3 backend/scripts/scrape_educational_data.py
+      - name: Export Logs from VPS (Optional)
+        if: env.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/miikun
+            source backend/venv/bin/activate
+            python3 backend/scripts/export_logs.py || echo "No logs to export"
+      - name: Download Data from VPS
+        if: env.VPS_HOST != ''
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > vps_key.pem
+          chmod 600 vps_key.pem
+          scp -o StrictHostKeyChecking=no -i vps_key.pem ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/miikun/train_data*.jsonl ./ || echo "No VPS data"
+      - name: Set Subjects Matrix
+        id: set-subjects
+        run: |
+          subjects=$(ls train_data_*.jsonl scraped_data.jsonl | sed 's/train_data_//;s/scraped_data.jsonl/general/;s/.jsonl//' | jq -R . | jq -s -c .)
+          echo "subjects=$subjects" >> $GITHUB_OUTPUT
+      - name: Upload Training Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-data
+          path: "*.jsonl"
+
+  train:
+    needs: prepare-data
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        subject: ${{ fromJson(needs['prepare-data'].outputs.subjects) }}
+      fail-fast: false
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Download Training Data
+        uses: actions/download-artifact@v4
+        with:
+          name: training-data
+      - name: Install dependencies
+        run: pip install -r backend/requirements_train.txt
+      - name: Run Subject Training
+        run: |
+          DATA_FILE=$(ls train_data_${{ matrix.subject }}.jsonl 2>/dev/null || ls scraped_data.jsonl)
+          python3 backend/scripts/train.py --subject ${{ matrix.subject }} --data $DATA_FILE
+        env:
+          BASE_MODEL: ${{ secrets.HF_BASE_MODEL }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      - name: Upload Adapter
+        uses: actions/upload-artifact@v4
+        with:
+          name: lora-${{ matrix.subject }}
+          path: models/active_lora/${{ matrix.subject }}
+
+  deploy:
+    permissions:
+      contents: write
+    needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Download all Adapters
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lora-*
+          path: models/active_lora
+          merge-multiple: true # Flatten so we get models/active_lora/subject/adapter_model.bin
+      - name: Push Initial LoRA Weights
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add models/active_lora/
+          git commit -m "Initial Multi-LoRA Training Complete"
+          git push origin main
+      - name: Trigger Webhook Reload
+        run: |
+          curl -X POST "${{ secrets.VPS_URL }}/api/webhook/reload" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}"

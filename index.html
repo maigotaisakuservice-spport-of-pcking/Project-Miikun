@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miikun Intelligence</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.160.0",
+          "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
+          "@pixiv/three-vrm": "https://esm.sh/@pixiv/three-vrm@2.1.0?external=three"
+        }
+      }
+    </script>
+</head>
+<body class="bg-[#FAFAFA] overflow-hidden text-slate-900 h-screen w-screen">
+
+    <!-- Subject Selector -->
+    <div class="absolute top-8 left-8 z-20 flex flex-col gap-2">
+        <div class="p-1 rounded-2xl bg-white/30 backdrop-blur-md border border-white/40 shadow-sm transition-all hover:shadow-md">
+            <select id="subject-selector" class="bg-transparent px-4 py-2 text-sm font-bold focus:outline-none cursor-pointer appearance-none">
+                <option value="general">放課後 (General)</option>
+                <option value="japanese">国語 (Japanese)</option>
+                <option value="math">数学 (Math)</option>
+                <option value="science">理科 (Science)</option>
+                <option value="social">社会 (Social)</option>
+                <option value="gs">GS (English)</option>
+                <option value="pe">保体 (PE)</option>
+                <option value="tech">技術 (Tech)</option>
+                <option value="home">家庭科 (Home)</option>
+                <option value="moral">道徳 (Moral)</option>
+                <option value="career">進路選択 (Career)</option>
+            </select>
+        </div>
+        <div id="subject-badge" class="px-3 py-1 bg-blue-500/10 text-blue-600 rounded-full text-[10px] font-black tracking-widest uppercase self-start pointer-events-none">CLASS: GENERAL</div>
+    </div>
+
+    <!-- 3D Canvas Layer -->
+    <canvas id="miikun-canvas" class="absolute inset-0 w-full h-full -z-10"></canvas>
+
+    <!-- Glassmorphic Chat Log Layer -->
+    <div id="chat-container" class="absolute right-0 top-0 w-[35%] h-full overflow-y-auto px-12 pt-40 pb-64 no-scrollbar flex flex-col justify-end pointer-events-none"></div>
+
+    <!-- UI Layer -->
+    <div class="absolute bottom-16 left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+        <div id="waveform" class="flex gap-1 h-6 mb-8 opacity-10 transition-all duration-300">
+            <div class="w-1 bg-slate-400 rounded-full h-full"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-3/4"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-1/2"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-3/4"></div>
+            <div class="w-1 bg-slate-400 rounded-full h-full"></div>
+        </div>
+
+        <button id="mic-button" class="group relative w-20 h-20 rounded-full bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center">
+            <div id="mic-ring" class="absolute inset-0 rounded-full border-4 border-blue-400/0 transition-all duration-300"></div>
+            <svg id="mic-icon" class="w-10 h-10 text-slate-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+            </svg>
+        </button>
+
+        <div id="loading-indicator" class="mt-4 flex items-center gap-2 opacity-0 transition-opacity">
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+        </div>
+        <p id="status-text" class="mt-4 text-xs font-medium text-slate-400 tracking-widest uppercase opacity-0 transition-opacity">Listening...</p>
+    </div>
+
+    <!-- Footer Links -->
+    <div class="absolute bottom-6 right-8 flex gap-6 items-center select-none group/footer">
+        <a href="#" id="open-help" class="text-xs font-bold text-indigo-500/80 hover:text-indigo-600 transition-colors border-b border-indigo-500/30 hover:border-indigo-600/60 pb-0.5">使い方とクレジット 📘</a>
+        <div class="text-[10px] text-slate-400/40 group-hover/footer:text-slate-400/80 transition-colors duration-300">VOICEVOX: 白上虎太郎 | AI Powered by Miikun Core</div>
+    </div>
+
+    <!-- Privacy Consent Modal (Professional Version) -->
+    <div id="consent-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-xl hidden">
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-lg border border-slate-200">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-2xl">🎓</div>
+                <h2 class="text-2xl font-black text-slate-800 tracking-tight">サービスのご利用にあたって</h2>
+            </div>
+            <div class="space-y-5 text-slate-600 leading-relaxed text-sm">
+                <p>
+                    「Miikun Intelligence」は、AIとの対話を通じて学習を支援する実験的プロジェクトです。
+                    より良い教育体験を提供するため、**入力された対話内容は個人を特定できない形でAIの学習に活用させていただきます。**
+                </p>
+                <p>
+                    名前や住所などの個人情報は、AIに送信される前に自動的な検閲・除外処理が行われます。
+                    本サービスをご利用いただくことで、これらのデータ収集および<button id="open-tos" class="text-indigo-500 font-bold underline decoration-indigo-300 underline-offset-4 hover:text-indigo-600">利用規約</button>に同意したものとみなされます。
+                </p>
+                <div id="optout-info" class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[12px] text-slate-500 italic">
+                    ※学習への協力を希望されない場合は、URLに <code>?optout=true</code> を追加してアクセスすることで、データ収集を無効化できます。
+                </div>
+            </div>
+            <button id="consent-btn" class="mt-10 w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 text-lg">
+                同意して開始する
+            </button>
+        </div>
+    </div>
+
+    <!-- Help & TOS Modal -->
+    <div id="help-modal" class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 backdrop-blur-xl hidden">
+        <div class="bg-white w-[90%] max-w-2xl h-[80vh] rounded-[2rem] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 id="help-title" class="text-xl font-black text-slate-800">使い方とクレジット</h2>
+                <button id="close-help" class="w-10 h-10 rounded-full hover:bg-slate-200/50 flex items-center justify-center transition-colors">
+                    <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="help-content" class="flex-1 overflow-y-auto p-8 prose prose-slate max-w-none no-scrollbar">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
